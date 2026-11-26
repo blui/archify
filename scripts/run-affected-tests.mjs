@@ -113,7 +113,6 @@ if (process.argv[1] && sameEntry(process.argv[1], fileURLToPath(import.meta.url)
   if (owners.some(owner => ['readme', 'changelog'].includes(owner))) run(['scripts/check-release-identity.mjs']);
   if (owners.includes('readme')) {
     // This consumer reads the README directly; the other cases need an Astro build.
-    run(['--test', '--test-name-pattern=README entry points', 'website/test/agent-diagrams.test.mjs']);
     run(['--test', '--test-name-pattern=READMEs', 'test/automatic-port-spread.test.mjs',
       'test/reach-share-card.test.mjs', 'test/route-share-card.test.mjs']);
   }

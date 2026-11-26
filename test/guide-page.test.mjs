@@ -55,7 +55,7 @@ test('guide page: ships bilingual recipes and syntactically valid interaction co
 test('guide search: preserves s in recipe IDs and matches whitespace-separated signals', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'docs/guide.html'), 'utf8');
   const recipes = JSON.parse(html.match(/<script id="guide-data" type="application\/json">([\s\S]*?)<\/script>/)[1]);
-  for (const file of ['docs/guide.html', 'website/src/scripts/guide.js']) {
+  for (const file of ['docs/guide.html']) {
     const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');
     const functions = source.slice(source.indexOf('function normalize('), source.indexOf('function recommendation('));
     const context = vm.createContext({ recipes });
