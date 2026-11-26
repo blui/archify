@@ -2226,7 +2226,7 @@ const COMMAND_USAGE = {
   'browser-check': '<output.html> [--json|--summary] [--require-provenance] [--out-dir <dir>]',
   'visual-check': '<output.html> [--json|--summary] [--require-provenance] [--out-dir <dir>]',
   guide: '[scenario or question] [--json] [--lang en|zh]',
-  brands: ['[name, alias, domain, or category] [--json]', 'capture <url> [--json]'],
+  brands: '[name, alias, domain, or category] [--json]',
   examples: '',
   doctor: '',
   demo: '[output-directory]',
@@ -6365,30 +6365,6 @@ async function commandBrands(args) {
   const unknown = args.filter((arg) => arg.startsWith('--') && arg !== '--json');
   if (unknown.length) fail(`Unknown brands option "${unknown[0]}".`);
   const positional = args.filter((arg) => arg !== '--json');
-  if (positional[0] === 'capture') {
-    if (positional.length !== 2) fail('Usage: archify brands capture <url> [--json]');
-    const { captureBrandReference } = await import('../renderers/shared/brand-marks.mjs');
-    let capture;
-    try {
-      capture = await captureBrandReference(positional[1]);
-    } catch (error) {
-      fail(error.message);
-    }
-    const result = {
-      schemaVersion: 1,
-      ok: true,
-      command: 'brands capture',
-      brand: capture.brand,
-      evidence: {
-        status: capture.resolved.status,
-        source: capture.resolved.sourceUrl,
-        ...(capture.resolved.sha256 ? { sha256: capture.resolved.sha256 } : {}),
-        ...(capture.resolved.contentType ? { contentType: capture.resolved.contentType } : {}),
-      },
-    };
-    console.log(json ? JSON.stringify(result, null, 2) : JSON.stringify(result.brand));
-    return;
-  }
   const query = positional.join(' ').trim();
   const { listBrandMarks } = await import('../renderers/shared/brand-marks.mjs');
   const marks = listBrandMarks(query);
@@ -6400,12 +6376,11 @@ async function commandBrands(args) {
       query,
       count: marks.length,
       marks,
-      fallback: 'Run "archify brands capture <url> --json", then use the returned digest-pinned brand value.',
     }, null, 2));
     return;
   }
   if (!marks.length) {
-    console.log(`No built-in brand matched "${query}". Run "archify brands capture <url> --json", then use the returned digest-pinned brand value.`);
+    console.log(`No built-in brand matched "${query}". Run "archify brands" to list every built-in ID, or omit the brand field.`);
     return;
   }
   const grouped = Map.groupBy

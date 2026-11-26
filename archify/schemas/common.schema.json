@@ -76,25 +76,13 @@
       "enum": ["calendar", "clock", "person", "briefcase", "flag", "moon", "frontend", "backend", "database", "cloud", "security", "messagebus", "external", "start", "active", "waiting", "decision", "success", "failure", "stop", "neutral", "none"]
     },
     "brandMark": {
-      "oneOf": [
-        {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 2048,
-          "anyOf": [
-            { "maxLength": 80, "pattern": "^[^\\r\\n]+$" },
-            { "pattern": "^https?://" }
-          ]
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["url", "sha256"],
-          "properties": {
-            "url": { "type": "string", "minLength": 8, "maxLength": 2048, "pattern": "^https?://" },
-            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
-          }
-        }
+      "description": "A built-in brand ID, alias, or official site URL whose domain matches a built-in brand. Run the brands command to list them. Brands resolve offline only.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "anyOf": [
+        { "maxLength": 80, "pattern": "^[^\\r\\n]+$" },
+        { "pattern": "^https?://" }
       ]
     },
     "variant": {
