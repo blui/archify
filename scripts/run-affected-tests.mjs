@@ -14,7 +14,7 @@ const shared = /^(geometry|spatial-grid|svg-path-(?:analysis|checker)|layout-rul
 const viewer = /^(viewer-|reader-|desktop-|semantic-|finder|focus|intent-|crossover-|animation|export-|motion-|offline-|i18n|relationship-|share-|reach-|presentation|story-)/;
 export function selectAffectedTests(owners, changed, available) {
   if (!Array.isArray(owners) || !Array.isArray(changed)) throw new Error('CI test selection must contain arrays');
-  const allowed = new Set(['renderer', 'viewer', 'authoring', 'schema', 'pr', 'atlas', 'site', 'artifact', 'delta', 'readme', 'llms', 'changelog', 'policy', 'readme-assets', 'explainer', 'dsh-docs', 'architecture', 'workflow', 'sequence', 'dataflow', 'lifecycle', 'erd', 'class', 'tree', 'timeline', 'waterfall']);
+  const allowed = new Set(['renderer', 'viewer', 'authoring', 'schema', 'pr', 'atlas', 'site', 'artifact', 'delta', 'readme', 'llms', 'changelog', 'policy', 'readme-assets', 'explainer', 'architecture', 'workflow', 'sequence', 'dataflow', 'lifecycle', 'erd', 'class', 'tree', 'timeline', 'waterfall']);
   if (owners.some(owner => !allowed.has(owner))) throw new Error('Unknown CI test owner');
   if (changed.some(name => !/^test\/[^/]+\.test\.mjs$/.test(name))) throw new Error('Invalid changed test path');
   return available.filter(file => {
@@ -32,7 +32,7 @@ export function selectAffectedTests(owners, changed, available) {
             : owner === 'readme' ? /^(readme-showcase|readme-support|cursor-onboarding|llms-txt|skill-metadata|preview-contract|community-proof-intake|real-repository-proof)\.test\.mjs$/.test(name)
             : owner === 'llms' ? name === 'llms-txt.test.mjs'
             : owner === 'explainer' ? name.startsWith('explainer-') && name !== 'explainer-browser.test.mjs'
-            : owner === 'changelog' || owner === 'dsh-docs' ? false
+            : owner === 'changelog' ? false
             : owner === 'policy' ? name === 'community-proof-intake.test.mjs'
             : owner === 'readme-assets' ? name === 'readme-showcase.test.mjs'
               : name.startsWith(`${owner}-`) || shared.test(name)
@@ -116,10 +116,6 @@ if (process.argv[1] && sameEntry(process.argv[1], fileURLToPath(import.meta.url)
     run(['--test', '--test-name-pattern=README entry points', 'website/test/agent-diagrams.test.mjs']);
     run(['--test', '--test-name-pattern=READMEs', 'test/automatic-port-spread.test.mjs',
       'test/reach-share-card.test.mjs', 'test/route-share-card.test.mjs']);
-    run(['--test', '--test-name-pattern=README install tables', 'integrations/hermes-agent/test/plugin-contract.test.mjs']);
-  }
-  if (owners.some(owner => ['readme', 'dsh-docs'].includes(owner))) {
-    run(['--test', 'integrations/deepseek-harness/test/docs-contract.test.mjs']);
   }
   if (owners.includes('atlas')) {
     run(['--test', ...['atlas', 'client-assets', 'source-panel'].map(name =>

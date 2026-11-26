@@ -13,8 +13,6 @@ const productionSourceRoots = [
   'archify/recipes',
   'archify/renderers',
   'archify/scripts',
-  'integrations/deepseek-harness/lib',
-  'integrations/deepseek-harness/scripts',
   'scripts',
 ];
 

@@ -20,9 +20,6 @@ const atlasBrowserTest = name => name.startsWith('test/code-analysis-') && maint
 const sharedSvgBaker = 'archify/renderers/shared/svg-bake.mjs';
 const explainerBrowserTest = 'test/explainer-browser.test.mjs';
 const explainerPresentation = /^archify\/explainer\/(?:browser-check\.mjs|diagrams\.mjs|layout\.mjs|reader\.(?:css|js)|render\.mjs|writing\.mjs)$/;
-const dshDocs = new Set([
-  'integrations/deepseek-harness/README.md', 'integrations/deepseek-harness/test/docs-contract.test.mjs',
-]);
 const gates = ['generated', 'browser', 'webm', 'package', 'windows', 'manifest', 'website'];
 const storyPresentationFiles = new Set([
   'component-stage.mjs', 'story-svg.mjs', 'svg-bake.mjs', 'story-stage-html.mjs', 'story-plan.mjs',
@@ -60,7 +57,7 @@ function explainerPresentationCompanion(name) {
 }
 
 function independentMediaPath(name) {
-  return explainerPresentationCompanion(name) || dshDocs.has(name) ||
+  return explainerPresentationCompanion(name) ||
     /^archify\/(?:modules\/code-analysis|explainer)\//.test(name) ||
     /^test\/(?:code-analysis(?:-[^/]+)?|explainer-[^/]+)\.test\.mjs$/.test(name);
 }
@@ -99,7 +96,6 @@ export function classifyPaths(paths) {
     }
     if (/^README(?:_EN|_ZH|_JA|_KO)?\.md$/.test(name)) { own('readme'); continue; }
     if (name === 'CHANGELOG.md') { own('changelog'); continue; }
-    if (dshDocs.has(name)) { own('dsh-docs'); continue; }
     if (/^(CONTRIBUTING|REVIEWING|AGENTS|CODE_OF_CONDUCT|SECURITY|SECURITY_MODEL)\.md$/.test(name)) { own('policy'); continue; }
     if (/^journal\/geo-[^/]+\/[^/]+\.md$/.test(name)) continue;
     if (name === 'llms.txt' || name === 'docs/llms.txt') {
@@ -199,7 +195,7 @@ export function classifyPaths(paths) {
       paths.every(name => atlasClient.test(name) || name === atlasGuide || name === 'archify.zip' || atlasBrowserTest(name))) {
     plan.browserProfile = 'atlas';
   }
-  if (plan.owners.every(owner => ['readme', 'llms', 'changelog', 'policy', 'readme-assets', 'dsh-docs'].includes(owner)) && !plan.changedTests.length && !gates.some(name => plan[name])) plan.scope = 'docs';
+  if (plan.owners.every(owner => ['readme', 'llms', 'changelog', 'policy', 'readme-assets'].includes(owner)) && !plan.changedTests.length && !gates.some(name => plan[name])) plan.scope = 'docs';
   // These inputs cannot change the public CLI or its compatibility smoke.
   // A change to the smoke itself must still exercise every supported runtime.
   plan.compatibility = plan.scope !== 'docs' && paths.some(name =>

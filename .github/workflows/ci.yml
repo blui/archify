@@ -101,9 +101,6 @@ jobs:
       - name: Generated outputs and representative goldens
         if: matrix.shard == 2
         run: pnpm run test:generated
-      - name: Verify community Hermes adapter
-        if: matrix.shard == 2
-        run: node --test integrations/hermes-agent/test/plugin-contract.test.mjs
       - name: Install Code Analysis duplicate detector
         if: matrix.module-shard
         run: npm install --prefix "$RUNNER_TEMP/archify-jscpd" --ignore-scripts --no-audit --no-fund jscpd@5.4.3

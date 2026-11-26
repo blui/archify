@@ -197,22 +197,6 @@ test('isolated Explainer rendering changes run its Node and Chrome cases and ret
   }
 });
 
-test('DeepSeek Harness documentation runs the integration docs contract without Archify product lanes', () => {
-  const files = ['integrations/deepseek-harness/README.md', 'integrations/deepseek-harness/test/docs-contract.test.mjs'];
-  for (const paths of [files, [files[1]]]) {
-    const plan = classifyPaths(paths);
-    assert.equal(plan.scope, 'docs');
-    assert.deepEqual(plan.owners, ['dsh-docs']);
-    for (const gate of ['generated', 'browser', 'webm', 'package', 'windows', 'manifest', 'website']) {
-      assert.equal(plan[gate], false, gate);
-    }
-  }
-  assert.equal(classifyPaths([...files, 'integrations/deepseek-harness/package.json']).scope, 'full');
-  assert.equal(classifyPaths([...files, 'archify.zip']).scope, 'full');
-  const mixed = classifyPaths([...files, 'viewer/viewer.css']);
-  assert.ok(mixed.owners.includes('dsh-docs') && mixed.generated && mixed.browser && mixed.webm && mixed.package);
-});
-
 test('five README languages and changelog use documentation checks and preserve mixed product gates', () => {
   const readmes = ['README.md', 'README_EN.md', 'README_ZH.md', 'README_JA.md', 'README_KO.md'];
   const available = ['readme-showcase', 'readme-support', 'cursor-onboarding', 'llms-txt', 'skill-metadata',
