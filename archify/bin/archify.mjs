@@ -2220,7 +2220,6 @@ const COMMAND_USAGE = {
   preview: '<type> <input.json> [output.html] [--no-open] [--quality standard|showcase] [--repo-root path]',
   validate: '<type> <input.json> [--json] [--layout-json] [--quality standard|showcase] [--repo-root path]',
   'export-svg': '<type> <input.json> <output.svg|stem> [--theme both|light|dark] [--preset name] [--animate-flow] [--json] [--quality standard|showcase] [--repo-root path]',
-  pr: ['preflight [--repo-root path] [--base ref] [--head ref] [--init dir] [--mode ask|on-demand|proactive] [--target body|comment] [--global-rules path] [--json]', 'validate <manifest.json> [--repo-root path] [--json]', 'build <manifest.json> --out-dir <dir> [--repo-root path] [--platform github|gitlab|generic] [--no-html] [--animate-flow] [--quality standard|showcase] [--json]', 'attach <pr-number-or-url|gitlab-mr-url> --manifest <build-receipt.json> [--target body|comment] [--repo owner/name] [--allow-stale] [--dry-run] [--json]'],
   migrate: 'workflow <old.json> <new.json> --to-schema 2 [--output portable.html] [--json] [--repo-root path]',
   inspect: '<type> <input.json>',
   check: '<output.html> [--json] [--require-provenance]',
@@ -7385,9 +7384,6 @@ try {
     case 'export-svg':
       await commandExportSvg(args);
       break;
-    case 'pr':
-      await (await import('../pr/cli.mjs')).commandPr(args, { rejectCliArgument, usage });
-      break;
     case 'migrate':
       await commandMigrate(args);
       break;
@@ -7430,7 +7426,7 @@ try {
   }
 } catch (error) {
   if (!error.archifyArgument) throw error;
-  if (['validate', 'deliver', 'finalize', 'inspect', 'patch', 'export-svg', 'pr'].includes(command) && args.includes('--json')) {
+  if (['validate', 'deliver', 'finalize', 'inspect', 'patch', 'export-svg'].includes(command) && args.includes('--json')) {
     reportArtifactArgumentFailure(command, error);
   } else {
     fail(error.message);
