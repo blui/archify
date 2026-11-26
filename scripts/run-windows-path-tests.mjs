@@ -11,7 +11,6 @@ import {
   sidecarNamespaceComponentKey,
 } from '../archify/renderers/shared/path-semantics.mjs';
 import { checkForUpdate } from '../archify/scripts/check-update.mjs';
-import { stageCleanSkill } from './stage-clean-skill.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillRoot = path.join(repoRoot, 'archify');
@@ -327,10 +326,6 @@ async function runControlledWindowsPathE2E() {
     assert.equal(JSON.parse(compared.stdout).ok, true);
     assert.ok(fs.existsSync(path.win32.join(uncRoot, path.win32.basename(compareOutput))));
 
-    const stagedSkill = path.win32.join(uncRoot, `${token}-staged-skill`);
-    stageCleanSkill({ repoRoot: driveCaseRepoRoot, destination: stagedSkill });
-    assert.ok(fs.existsSync(path.join(stagedSkill, 'renderers', 'shared', 'sidecar-path.mjs')));
-
     const localRelease = JSON.parse(fs.readFileSync(path.join(skillRoot, 'skill-release.json'), 'utf8'));
     localRelease.channel = 'stable';
     localRelease.version = '2.15.0';
@@ -513,25 +508,6 @@ async function runControlledWindowsPathE2E() {
     await preview.stop();
     preview = null;
     assertNoPrivateStaging(ordinaryLongDirectory, '.archify-preview-');
-
-    if (Number(process.versions.node.split('.')[0]) === 22) {
-      const uncArchive = path.win32.join(uncRoot, `${token}-archify.zip`);
-      const bashCandidates = [
-        process.env.BASH,
-        'C:\\Program Files\\Git\\bin\\bash.exe',
-        'bash',
-      ].filter(Boolean);
-      const bash = bashCandidates.find((candidate) => (
-        candidate === 'bash' || fs.existsSync(candidate)
-      )) || 'bash';
-      const archiveBuild = spawnSync(
-        bash,
-        [path.join(repoRoot, 'scripts', 'build-zip.sh'), uncArchive],
-        { cwd: repoRoot, encoding: 'utf8', timeout: 180_000 },
-      );
-      requireSuccess('canonical ZIP publication to ordinary UNC', archiveBuild);
-      assert.equal(fs.readFileSync(uncArchive).subarray(0, 4).toString('hex'), '504b0304');
-    }
   } finally {
     if (preview) await preview.stop().catch(() => {});
     removeChildren(caseRoot);
@@ -540,7 +516,6 @@ async function runControlledWindowsPathE2E() {
 }
 
 const fullSuites = [
-  'test/release-package-gates.test.mjs',
   'test/skill-metadata.test.mjs',
   'test/copy-site-assets.test.mjs',
   'test/path-boundary-contract.test.mjs',

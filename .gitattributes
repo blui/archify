@@ -20,4 +20,3 @@
 * text=auto eol=lf
 
 # Release archives contain binary bytes and must not be line-normalized.
-archify.zip binary
