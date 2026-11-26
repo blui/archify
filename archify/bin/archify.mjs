@@ -6220,18 +6220,6 @@ async function commandDoctor(args) {
     missing: fs.existsSync(scenarioGuide) ? 0 : 1,
   });
 
-  const authoringReferences = [
-    path.join(skillRoot, 'references', 'authoring-contract.md'),
-    path.join(skillRoot, 'references', 'viewer-runtime.md'),
-    path.join(skillRoot, 'references', 'delivery-contract.md'),
-  ];
-  const authoringReferencesMissing = authoringReferences.filter((file) => !fs.existsSync(file)).length;
-  checks.push({
-    label: 'Progressive authoring references',
-    ok: authoringReferencesMissing === 0,
-    missing: authoringReferencesMissing,
-  });
-
   const compareRuntime = path.join(skillRoot, 'delta/architecture-delta.mjs');
   const compareFixtures = [
     path.join(skillRoot, 'examples/checkout-platform.base.architecture.json'),

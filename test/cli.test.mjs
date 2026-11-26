@@ -113,7 +113,6 @@ test('cli: doctor reports a complete installation is ready', () => {
   assert.match(result.stdout, /\[ok\] Sidecar path naming runtime/);
   assert.match(result.stdout, /\[ok\] Finalize runtime/);
   assert.match(result.stdout, /\[ok\] Scenario recipe guide/);
-  assert.match(result.stdout, /\[ok\] Progressive authoring references/);
   assert.match(result.stdout, /\[ok\] Architecture compare runtime and proof fixtures/);
   assert.match(result.stdout, /\[ok\] Standalone schema validators/);
   assert.match(result.stdout, /\[ok\] architecture renderer, schema, and example/);

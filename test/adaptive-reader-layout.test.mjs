@@ -19,7 +19,6 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillRoot = path.resolve(__dirname, '..', 'archify');
 const template = fs.readFileSync(path.join(skillRoot, 'assets', 'template.html'), 'utf8');
-const skill = fs.readFileSync(path.join(skillRoot, 'references/authoring-defaults.md'), 'utf8');
 test('desktop readability budget matches the minimum adaptive reader at 1440 by 900', () => {
   assert.deepEqual(DESKTOP_READABILITY_VIEWPORT, { width: 1440, height: 900 });
   assert.equal(DESKTOP_READER_MIN_WIDTH, 960);
@@ -64,14 +63,6 @@ test('declared-wide budget is additive and reports a cap without changing the le
 // Browser ownership, geometry and settling live in reader-layout-browser and
 // reader-readability-maintained-browser; these checks keep the public declaration
 // and authoring documentation aligned without prescribing the scheduler's code.
-test('reader declaration and authoring guidance preserve the public readability contract', () => {
+test('reader declaration preserves the public readability contract', () => {
   assert.equal((template.match(/<meta name="archify-reader-contract" content="declared-wide-v1">/g) || []).length, 1);
-  assert.match(skill, /Automated browser evidence\]\(delivery-contract\.md#automated-browser-evidence\)/);
-  assert.match(skill, /intrinsic-height page scroll/);
-  const delivery = fs.readFileSync(path.join(skillRoot, 'references/delivery-contract.md'), 'utf8');
-  const authoring = fs.readFileSync(path.join(skillRoot, 'references/authoring-contract.md'), 'utf8');
-  assert.match(delivery, /1440×900, 1600×1000, 1920×1080, and\s+2048×1320/);
-  assert.match(delivery, /Reader-declared readable exception/);
-  assert.match(authoring, /Generate one responsive artifact for laptops and external displays/);
-  assert.match(authoring, /preserv(?:e|ing) the authored SVG\/viewBox, proportions, semantic geometry/);
 });

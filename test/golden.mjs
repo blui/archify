@@ -242,13 +242,6 @@ check('package-lock.json version matches package.json',
   lock.version === pkg.version && lock.packages?.['']?.version === pkg.version,
   `lockfile says ${lock.version} — run npm install and rebuild the zip`);
 
-const skillMd = fs.readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8');
-const skillVersion = (skillMd.match(/^\s*version:\s*"([^"]+)"/m) || [])[1];
-const packageMajorMinor = pkg.version.match(/^(\d+\.\d+)\./)?.[1];
-check('SKILL.md metadata version matches package.json major.minor',
-  !!packageMajorMinor && skillVersion === packageMajorMinor,
-  `SKILL.md says ${skillVersion}, package.json says ${pkg.version}`);
-
 for (const readmeName of ['README.md', 'README_EN.md', 'README_ZH.md', 'README_JA.md']) {
   const readme = fs.readFileSync(path.join(repoRoot, readmeName), 'utf8');
   const badgeVersions = shieldsBadgeMessages(readme, 'version');

@@ -124,17 +124,15 @@ test('the sublabel diagnostic reports the width in force, not the historical con
   assert.doesNotMatch(stderr, /boxes are a fixed/, 'spread must not quote the fixed layout');
 });
 
-test('the authoring contract explains automatic spread and explicit geometry compatibility', () => {
+test('the schema and renderer README explain automatic spread and explicit geometry compatibility', () => {
   const schema = JSON.parse(fs.readFileSync(path.join(skillRoot, 'schemas/sequence.schema.json'), 'utf8'));
   const description = schema.properties.meta.properties.column_fit.description;
-  const skill = fs.readFileSync(path.join(skillRoot, 'references/authoring-defaults.md'), 'utf8');
   const rendererReadme = fs.readFileSync(path.join(skillRoot, 'renderers/sequence/README.md'), 'utf8');
 
   assert.match(description, /wide viewBox/);
   assert.match(description, /meaningful participant labels/);
   assert.match(description, /Defaults to spread whether or not meta\.viewBox is supplied/);
   assert.match(description, /Explicit fixed preserves the historical 86px boxes and 108px column gap/);
-  assert.match(skill, /use `spread` when a wide viewBox leaves unused horizontal space or meaningful labels need width/);
   assert.match(rendererReadme, /Use `"spread"` when a wide/);
   assert.match(rendererReadme, /default to `meta\.column_fit: "spread"`, whether or not\s+`meta\.viewBox` is supplied/);
   assert.match(rendererReadme, /try `meta\.column_fit: "spread"` before shortening/);

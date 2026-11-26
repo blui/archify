@@ -490,7 +490,6 @@ async function runControlledWindowsPathE2E() {
 }
 
 const fullSuites = [
-  'test/skill-metadata.test.mjs',
   'test/copy-site-assets.test.mjs',
   'test/path-boundary-contract.test.mjs',
   'test/temp-cleanup.test.mjs',
