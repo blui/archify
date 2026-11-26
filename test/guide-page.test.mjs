@@ -43,7 +43,7 @@ test('guide page: ships bilingual recipes and syntactically valid interaction co
   const dataMatch = html.match(/<script id="guide-data" type="application\/json">([\s\S]*?)<\/script>/);
   assert.ok(dataMatch);
   const data = JSON.parse(dataMatch[1]);
-  assert.ok(data.every((recipe) => recipe.en.prompt && recipe.zh.prompt && recipe.proof));
+  assert.ok(data.every((recipe) => recipe.proof && recipe.en.prompt === undefined && recipe.zh.prompt === undefined));
   assert.ok(data.some((recipe) => recipe.id === 'layout-repair'));
   assert.match(html, /gallery\.html#proof-/);
 

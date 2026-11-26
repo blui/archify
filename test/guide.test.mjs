@@ -23,9 +23,10 @@ test('guide: every recipe has complete English and Chinese decision copy', () =>
     for (const lang of ['en', 'zh']) {
       const copy = recipe[lang];
       assert.ok(copy.title.trim(), `${recipe.id}.${lang}.title`);
-      for (const field of ['question', 'summary', 'useWhen', 'avoidWhen', 'prompt']) {
+      for (const field of ['question', 'summary', 'useWhen', 'avoidWhen']) {
         assert.ok(copy[field].trim(), `${recipe.id}.${lang}.${field}`);
       }
+      assert.equal(copy.prompt, undefined, `${recipe.id}.${lang} must not carry an agent prompt`);
       assert.ok(copy.include.length > 0 && copy.include.every((entry) => entry.trim()), `${recipe.id}.${lang}.include`);
     }
   }
@@ -85,8 +86,8 @@ test('guide: repair recipe supports exact selection and explicit language overri
     assert.equal(exact.recommendation.id, 'layout-repair');
     assert.equal(exact.confidence, 'high');
     assert.equal(exact.lang, lang);
-    assert.equal(recommendScenario('viewport overflow', { lang }).recommendation.prompt, exact.recommendation.prompt);
-    assert.equal(recommendScenario('视口溢出', { lang }).recommendation.prompt, exact.recommendation.prompt);
+    assert.equal(recommendScenario('viewport overflow', { lang }).recommendation.id, exact.recommendation.id);
+    assert.equal(recommendScenario('视口溢出', { lang }).recommendation.id, exact.recommendation.id);
   }
 });
 

@@ -24,7 +24,6 @@ test('repository language metadata separates generated artifacts from implementa
     'docs/gallery.html',
     'docs/gallery/artifacts/web-app.architecture.html',
     'docs/guide.html',
-    'docs/start.html',
     'archify/renderers/shared/generated-brand-marks.mjs',
     'archify/renderers/shared/generated-validators.mjs',
   ]) {

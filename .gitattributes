@@ -6,7 +6,6 @@
 /docs/gallery.html linguist-generated=true
 /docs/gallery/artifacts/*.html linguist-generated=true
 /docs/guide.html linguist-generated=true
-/docs/start.html linguist-generated=true
 
 # Deterministic build outputs committed for zero-install and release verification.
 /archify/assets/template.html linguist-generated=true
