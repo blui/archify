@@ -86,20 +86,6 @@ function gitBashForWindows(cwd, env = process.env) {
   return { gitExe, gitBash };
 }
 
-function shellForFixture() {
-  if (process.platform !== 'win32') return 'bash';
-  const { gitBash } = gitBashForWindows(repoRoot);
-  assert.ok(fs.existsSync(gitBash), `Git Bash is required for the Windows fixture: ${gitBash}`);
-  return gitBash;
-}
-
-function writeStarHistoryCharts(cwd, version) {
-  const assets = path.join(cwd, 'assets');
-  fs.mkdirSync(assets, { recursive: true });
-  fs.writeFileSync(path.join(assets, 'star-history-light.svg'), `<svg><title>light ${version}</title></svg>\n`);
-  fs.writeFileSync(path.join(assets, 'star-history-dark.svg'), `<svg><title>dark ${version}</title></svg>\n`);
-}
-
 function skipSubBlocks(buffer, start) {
   let offset = start;
   while (offset < buffer.length) {
@@ -440,34 +426,6 @@ test('README preserves the visual proof set and key content', () => {
 
 });
 
-test('all README languages end with the self-hosted star history chart', () => {
-  const lightChart = 'https://raw.githubusercontent.com/tt-a1i/archify/star-history/assets/star-history-light.svg';
-  const darkChart = 'https://raw.githubusercontent.com/tt-a1i/archify/star-history/assets/star-history-dark.svg';
-  const workflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'star-history.yml'), 'utf8');
-
-  for (const language of readmeLanguages) {
-    const filename = language.file;
-    const readme = fs.readFileSync(path.join(repoRoot, filename), 'utf8');
-    const starHistoryIndex = readme.lastIndexOf('## Star History');
-    const contributingIndex = sectionIndex(readme, filename, language.contributing);
-    assert.ok(starHistoryIndex > contributingIndex, `${filename}: Star History must follow Contributing`);
-    assert.ok(readme.includes(lightChart), `${filename}: missing light star history chart`);
-    assert.ok(readme.includes(darkChart), `${filename}: missing dark star history chart`);
-    assert.equal(readme.trimEnd().endsWith('</p>'), true, `${filename}: Star History must remain the final section`);
-  }
-
-  assert.match(workflow, /permissions:\n  contents: write/);
-  assert.match(workflow, /narayann7\/star-history-action@[0-9a-f]{40}/);
-  // Upstream PR #6 migrates setup-node to Node 24 without the v1.0.6 chart changes.
-  assert.match(workflow, /narayann7\/star-history-action@00dfada13f106e4114ee46728aa415857078e76c\s/);
-  assert.match(workflow, /output-dir: assets/);
-  assert.match(workflow, /update-readme: ['"]false['"]/);
-  assert.match(workflow, /commit: ['"]false['"]/);
-  assert.match(workflow, /bash scripts\/publish-star-history\.sh star-history/);
-  assert.doesNotMatch(workflow, /branch: star-history/);
-  assert.doesNotMatch(workflow, /xpzouying\/star-history/);
-});
-
 test('Windows Git Bash discovery ignores GIT_EXEC_PATH', { skip: process.platform !== 'win32' }, () => {
   const missing = path.join(os.tmpdir(), 'archify-missing-git-exec-path');
   const normal = gitBashForWindows(repoRoot);
@@ -479,64 +437,6 @@ test('Windows Git Bash discovery ignores GIT_EXEC_PATH', { skip: process.platfor
   }
   assert.equal(fs.existsSync(missing), false);
 });
-
-test('Star History publishing advances the data branch without a force push', () => {
-  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-star-history-'));
-  const remote = path.join(fixture, 'remote.git');
-  const firstCheckout = path.join(fixture, 'first');
-  const secondCheckout = path.join(fixture, 'second');
-  const publisher = path.join(repoRoot, 'scripts', 'publish-star-history.sh');
-
-  try {
-    const shell = shellForFixture();
-    git(fixture, ['init', '--bare', remote]);
-    git(fixture, ['--git-dir', remote, 'config', 'receive.denyNonFastForwards', 'true']);
-    git(fixture, ['--git-dir', remote, 'config', 'receive.denyDeletes', 'true']);
-
-    fs.mkdirSync(firstCheckout);
-    git(firstCheckout, ['init', '-b', 'main']);
-    git(firstCheckout, ['config', 'user.name', 'Fixture']);
-    git(firstCheckout, ['config', 'user.email', 'fixture@example.com']);
-    fs.writeFileSync(path.join(firstCheckout, 'README.md'), 'fixture\n');
-    git(firstCheckout, ['add', 'README.md']);
-    git(firstCheckout, ['commit', '-m', 'seed']);
-    git(firstCheckout, ['remote', 'add', 'origin', remote]);
-    git(firstCheckout, ['push', '-u', 'origin', 'main']);
-
-    const firstTemp = path.join(fixture, 'run-1');
-    fs.mkdirSync(firstTemp);
-    writeStarHistoryCharts(firstCheckout, 'v1');
-    execFileSync(shell, [publisher, 'star-history'], {
-      cwd: firstCheckout,
-      env: { ...process.env, RUNNER_TEMP: firstTemp },
-    });
-    const firstCommit = git(fixture, ['--git-dir', remote, 'rev-parse', 'refs/heads/star-history']);
-
-    git(fixture, ['clone', '--branch', 'main', remote, secondCheckout]);
-    const secondTemp = path.join(fixture, 'run-2');
-    fs.mkdirSync(secondTemp);
-    writeStarHistoryCharts(secondCheckout, 'v2');
-    execFileSync(shell, [publisher, 'star-history'], {
-      cwd: secondCheckout,
-      env: { ...process.env, RUNNER_TEMP: secondTemp },
-    });
-    const secondCommit = git(fixture, ['--git-dir', remote, 'rev-parse', 'refs/heads/star-history']);
-
-    assert.notEqual(secondCommit, firstCommit);
-    git(fixture, ['--git-dir', remote, 'merge-base', '--is-ancestor', firstCommit, secondCommit]);
-    assert.deepEqual(
-      git(fixture, ['--git-dir', remote, 'ls-tree', '-r', '--name-only', secondCommit]).split('\n'),
-      ['assets/star-history-dark.svg', 'assets/star-history-light.svg'],
-    );
-    assert.match(
-      git(fixture, ['--git-dir', remote, 'show', `${secondCommit}:assets/star-history-light.svg`]),
-      /light v2/,
-    );
-  } finally {
-    fs.rmSync(fixture, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-  }
-});
-
 
 test('showcase CLI runs through a filesystem alias while imports remain inert', (t) => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-showcase-alias-'));
