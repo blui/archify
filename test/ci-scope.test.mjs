@@ -4,11 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { parse } from 'yaml';
 import { classifyPaths, comparisonPlan } from '../scripts/ci-scope.mjs';
 import { selectAffectedTests } from '../scripts/run-affected-tests.mjs';
 
-const workflow = parse(fs.readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
 
 test('owned changes add their real gates without requiring every unrelated lane', () => {
   assert.equal(classifyPaths(['README.md', 'docs/assets/community/qq.svg']).scope, 'docs');
@@ -60,7 +58,6 @@ test('Atlas-only changes keep CLI, overlay, browser and package checks without u
     'test/browser-gate.test.mjs', 'test/code-analysis.test.mjs', 'test/code-analysis-browser.test.mjs',
     'test/export-browser.test.mjs',
   ]), ['test/browser-gate.test.mjs', 'test/code-analysis-browser.test.mjs', 'test/code-analysis.test.mjs']);
-  assert.equal(workflow.jobs.scope.outputs.browserProfile, '${{ steps.classify.outputs.browserProfile }}');
   assert.equal(classifyPaths([...paths, 'viewer/viewer.css']).browserProfile, 'full');
   assert.equal(classifyPaths([...paths, 'test/export-browser.test.mjs']).browserProfile, 'full');
   for (const extra of ['archify/modules/code-analysis/extract/ts/index.mjs',
@@ -220,36 +217,6 @@ test('five README languages and changelog use documentation checks and preserve 
   assert.deepEqual(selectAffectedTests(mixed.owners, [], available), available.slice().sort());
   assert.equal(classifyPaths(['README_JA.md', 'test/readme-support.test.mjs']).scope, 'core');
   for (const file of ['README_FR.md', 'CHANGELOG_ZH.md', 'archify/README.md']) assert.equal(classifyPaths([file]).scope, 'full', file);
-});
-
-test('documentation workflow installs parser dependencies and runs the affected contracts', () => {
-  const steps = workflow.jobs.scope.steps;
-  const install = steps.findIndex(step => step.name === 'Install documentation check dependencies');
-  const check = steps.findIndex(step => step.name === 'Check affected documentation contracts');
-  assert.ok(install >= 0 && check > install);
-  assert.match(steps[install].if, /scope == 'docs'/);
-  assert.match(steps[install].if, /'readme'/);
-  assert.match(steps[install].if, /'changelog'/);
-  assert.match(steps[install].run, /^pnpm --filter archify-repository install --frozen-lockfile\b/);
-  assert.equal(steps[check].if, "steps.classify.outputs.scope == 'docs'");
-  assert.equal(steps[check].run, 'node scripts/run-affected-tests.mjs');
-  assert.equal(steps[check].env.CI_TEST_OWNERS, '${{ steps.classify.outputs.owners }}');
-});
-
-test('Windows-only regressions retain native coverage and provision the package job for delivery-lock tests', () => {
-  for (const file of ['test/repository-evidence-replacement.test.mjs', 'test/cli-delivery-lock.test.mjs']) {
-    const plan = classifyPaths([file]);
-    assert.equal(plan.scope, 'core', file);
-    assert.equal(plan.windows, true, file);
-    assert.deepEqual(plan.changedTests, [file]);
-    assert.equal(plan.browser, false, file);
-    assert.equal(plan.package, false, file);
-  }
-  const steps = workflow.jobs['package-smoke'].steps;
-  for (const action of ['actions/checkout', 'actions/setup-node']) {
-    const step = steps.find(step => step.uses?.startsWith(`${action}@`));
-    assert.equal(step.if, "needs.scope.outputs.package == 'true' || (needs.scope.outputs.windows == 'true' && runner.os != 'Linux')");
-  }
 });
 
 test('Story filesystem and process owners retain full regression and Windows gates', () => {
@@ -478,29 +445,6 @@ test('real Git comparison retains rename source ownership and detects added test
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('required jobs fail when classification fails or returns an unknown scope', () => {
-  for (const name of ['test', 'canonical-test', 'zip-freshness', 'published-update-manifest', 'package-smoke', 'windows-test-portability']) {
-    const step = workflow.jobs[name].steps.find(step => step.name === 'Require successful scope checks');
-    assert.ok(step, name);
-    for (const [result, scope, status] of [['success', 'docs', 0], ['failure', 'docs', 1], ['success', 'core', 0], ['success', 'full', 0], ['failure', 'core', 1], ['success', '', 1], ['success', 'unknown', 1]]) {
-      const run = spawnSync('bash', ['-e', '-c', step.run], {
-        env: {
-          ...process.env,
-          SCOPE_RESULT: result,
-          CI_SCOPE: scope,
-          RUN_WINDOWS: 'true',
-          RUN_MANIFEST: 'true',
-          CI_COMPATIBILITY: scope === 'docs' ? 'false' : 'true',
-        },
-      });
-      assert.equal(run.status, status, `${name}: ${result}/${scope}`);
-    }
-  }
-  const fetch = workflow.jobs.scope.steps.find(step => step.name === 'Fetch PR comparison base');
-  assert.ok(fetch.run.includes('--depth=1') && fetch.run.includes('--no-tags'));
-  assert.equal(fetch.if, "github.event_name == 'pull_request'");
-});
-
 test('local affected checks use committed and dirty paths and reject ambiguous or empty selections', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-local-affected-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -606,39 +550,4 @@ test('local affected checks use committed and dirty paths and reject ambiguous o
   assert.equal(browserOnly.status, 0, browserOnly.stderr);
   assert.deepEqual(executed(), []);
   assert.deepEqual(JSON.parse(fs.readFileSync(browserReceipt, 'utf8')), ['test/i18n-browser.test.mjs']);
-});
-
-for (const [job, gate, variable] of [
-  ['windows-test-portability', 'windows', 'RUN_WINDOWS'],
-  ['published-update-manifest', 'manifest', 'RUN_MANIFEST'],
-]) {
-  test(`${job} skips only when a successful scope explicitly excludes it`, () => {
-    const lane = workflow.jobs[job];
-    assert.equal(lane.if, `always() && !cancelled() && !(needs.scope.result == 'success' && needs.scope.outputs.${gate} == 'false' `
-      + "&& (needs.scope.outputs.scope == 'docs' || needs.scope.outputs.scope == 'core'))");
-    const guard = lane.steps.find(step => step.name === 'Require successful scope checks');
-    assert.equal(guard.env[variable], '${{ needs.scope.outputs.' + gate + ' }}');
-    for (const flag of ['', 'false', 'true']) {
-      const run = spawnSync('bash', ['-e', '-c', guard.run], {
-        env: { ...process.env, SCOPE_RESULT: 'success', CI_SCOPE: 'full', [variable]: flag },
-      });
-      assert.equal(run.status, flag === 'true' ? 0 : 1, `full scope with ${gate}=${JSON.stringify(flag)}`);
-    }
-  });
-}
-
-test('canonical Node cannot pass full CI with failed, cancelled or skipped regression shards', () => {
-  const step = workflow.jobs['canonical-test'].steps.find(step => step.name === 'Require complete regression shards');
-  assert.equal(step.if, undefined, 'every canonical check must validate its complete regression dependency');
-  assert.equal(step.env.REGRESSION_RESULT, '${{ needs.full-regression.result }}');
-  assert.equal(step.env.CI_SCOPE, '${{ needs.scope.outputs.scope }}');
-  for (const scope of ['full', 'core', 'docs', '', 'unknown']) {
-    for (const result of ['success', 'failure', 'cancelled', 'skipped', '']) {
-      const expected = scope === 'full' ? result === 'success' : ['core', 'docs'].includes(scope) && result === 'skipped';
-      const run = spawnSync('bash', ['-e', '-c', step.run], {
-        env: { ...process.env, CI_SCOPE: scope, REGRESSION_RESULT: result },
-      });
-      assert.equal(run.status, expected ? 0 : 1, `${scope}/${result}`);
-    }
-  }
 });

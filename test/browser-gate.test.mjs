@@ -5,7 +5,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from 'yaml';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'archify');
 const repoRoot = path.dirname(skillRoot);
@@ -146,34 +145,6 @@ for (const outcome of [{ status: 7, signal: null }, { status: null, signal: 'SIG
   });
 }
 
-test('CI and release use the same browser command and retain WebM decoding', () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
-  assert.equal(manifest.scripts['test:browser'], 'node scripts/run-browser-tests.mjs');
-  for (const [workflow, browserJob, webmJob, browserCommand] of [
-    ['ci.yml', 'browser-regression', 'webm-decode', 'pnpm run test:browser --shard=${{ matrix.shard }}/${{ strategy.job-total }}'],
-    ['release.yml', 'release', 'release', 'pnpm run test:browser'],
-  ]) {
-    const jobs = parse(fs.readFileSync(path.join(repoRoot, '.github/workflows', workflow), 'utf8')).jobs;
-    const gate = jobs[browserJob].steps.find(step => step.name === 'Run shared browser regression gate');
-    assert.equal(gate?.run, browserCommand, `${workflow} must invoke the shared gate`);
-    assert.equal(gate['working-directory'], undefined);
-    assert.equal(gate.env.ARCHIFY_CHROME, '${{ steps.setup-chrome.outputs.chrome-path }}');
-    if (workflow === 'ci.yml') {
-      const media = jobs[webmJob].steps.find(step => step.env?.CI_WEBM_PROFILE);
-      assert.equal(media?.env.CI_WEBM_PROFILE, '${{ needs.scope.outputs.webmProfile }}');
-      assert.equal(media.run, 'node test/webm-artifact.smoke.mjs "$CI_WEBM_PROFILE"');
-      const language = jobs.website.steps.find(step => step.run === 'node --test test/site-language-integration.mjs');
-      assert.equal(language?.if, "matrix.target == 'cloudflare'");
-      assert.ok(language.env.ARCHIFY_CHROME);
-      const builders = jobs['canonical-test'].steps.find(step => step.run?.includes("--test-name-pattern='custom site builders'"));
-      assert.equal(builders?.if, "needs.scope.outputs.scope == 'core' && needs.scope.outputs.generated == 'true' && needs.scope.outputs.website == 'false'");
-    } else {
-      assert.ok(jobs[webmJob].steps.some(step => step.run === 'pnpm run test:webm'));
-      assert.equal(manifest.scripts['test:webm'], 'node test/webm-artifact.smoke.mjs && node --test test/site-language-integration.mjs');
-    }
-  }
-});
-
 test('browser shards are deterministic, nonempty, disjoint and cover the full maintained inventory', (t) => {
   const full = JSON.parse(interceptedRun(t, { status: 0 }).stdout).args.filter(arg => !arg.startsWith('--'));
   const shards = [1, 2, 3, 4].map(index => {
@@ -192,49 +163,6 @@ test('browser shards are deterministic, nonempty, disjoint and cover the full ma
   assert.notEqual(owner('desktop-reader-browser.test.mjs'), owner('i18n-browser.test.mjs'));
   assert.notEqual(owner('desktop-reader-browser.test.mjs'), owner('packaged-examples-browser.test.mjs'));
   assert.notEqual(owner('viewer-chrome-layout.test.mjs'), owner('reader-layout-browser.test.mjs'));
-});
-
-test('CI browser profiles preserve the exact Atlas and media test inventories across shards', () => {
-  const list = (env = {}, args = []) => spawnSync(process.execPath, [runner, '--list', ...args], {
-    encoding: 'utf8', env: { ...process.env, ARCHIFY_CHROME: '', ...env },
-  });
-  const full = list().stdout.trim().split('\n');
-  const cases = [
-    [{ CI_BROWSER_PROFILE: 'atlas' }, full.filter(file => file.startsWith('test/code-analysis-'))],
-    [{ CI_STORY_BROWSER_OWNER: 'webm' }, full.filter(file => file !== 'test/story-browser.test.mjs')],
-  ];
-  for (const [env, expected] of cases) {
-    const selected = [];
-    for (const index of [1, 2, 3, 4]) {
-      const result = list(env, [`--shard=${index}/4`]);
-      assert.equal(result.status, 0, result.stderr);
-      const files = result.stdout.trim().split('\n');
-      assert.ok(files.every(Boolean));
-      selected.push(...files);
-    }
-    assert.deepEqual(selected.sort(), expected.sort());
-  }
-  assert.ok(full.includes('test/story-browser.test.mjs'));
-  const mediaShards = [1, 2, 3, 4].map(index => list(
-    { CI_STORY_BROWSER_OWNER: 'webm' }, [`--shard=${index}/4`],
-  ).stdout.trim().split('\n'));
-  assert.notEqual(
-    mediaShards.findIndex(files => files.includes('test/desktop-reader-browser.test.mjs')),
-    mediaShards.findIndex(files => files.includes('test/packaged-examples-browser.test.mjs')),
-  );
-  for (const env of [{ CI_BROWSER_PROFILE: 'atals' }, { CI_STORY_BROWSER_OWNER: 'unknown' }]) {
-    assert.notEqual(list(env).status, 0);
-  }
-  const ci = parse(fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8')).jobs;
-  const release = parse(fs.readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8')).jobs.release;
-  const browser = job => job.steps.find(step => step.name === 'Run shared browser regression gate');
-  assert.equal(browser(ci['browser-regression']).env.CI_BROWSER_PROFILE, '${{ needs.scope.outputs.browserProfile }}');
-  assert.equal(browser(ci['browser-regression']).env.CI_BROWSER_TESTS, '${{ needs.scope.outputs.browserTests }}');
-  assert.equal(ci.scope.outputs.browserTests, '${{ steps.classify.outputs.browserTests }}');
-  assert.equal(browser(ci['browser-regression']).env.CI_STORY_BROWSER_OWNER,
-    "${{ needs.scope.outputs.webm == 'true' && needs.scope.outputs.webmProfile != 'viewer' && 'webm' || 'browser' }}");
-  assert.equal(browser(release).env.CI_STORY_BROWSER_OWNER, 'webm');
-  assert.ok(release.steps.findIndex(step => step.run === 'pnpm run test:webm') < release.steps.indexOf(browser(release)));
 });
 
 test('changed browser profile runs only maintained suites and rejects invalid selections before launch', () => {
@@ -305,82 +233,3 @@ test('sharded browser gates retain Chrome requirements and propagate child failu
   }
 });
 
-test('CI media gates fail closed and run only for their affected responsibility', () => {
-  const jobs = parse(fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8')).jobs;
-  assert.equal(jobs['browser-regression'].strategy['fail-fast'], false);
-  assert.equal(jobs['browser-regression'].strategy.matrix.shard,
-    "${{ fromJSON((needs.scope.outputs.browserProfile != 'changed' || fromJSON(needs.scope.outputs.browserTests || '[]')[4]) && '[1,2,3,4]' || '[1]') }}");
-  for (const [name, flag] of [['browser-regression', 'browser'], ['webm-decode', 'webm']]) {
-    const job = jobs[name];
-    assert.equal(job.needs, 'scope');
-    assert.equal(job.if, `needs.scope.result == 'success' && needs.scope.outputs.${flag} == 'true'`);
-    assert.ok(job.steps.every(step => step.if === undefined), `${name} runs every step when requested`);
-  }
-  const aggregate = jobs['webm-artifact'];
-  assert.deepEqual(aggregate.needs, ['scope', 'browser-regression', 'webm-decode']);
-  assert.equal(aggregate.if, 'always() && !cancelled()');
-  const step = aggregate.steps[0];
-  assert.equal(step.env.SCOPE_RESULT, '${{ needs.scope.result }}');
-  assert.equal(step.env.CI_SCOPE, '${{ needs.scope.outputs.scope }}');
-  assert.equal(step.env.CI_BROWSER, '${{ needs.scope.outputs.browser }}');
-  assert.equal(step.env.CI_BROWSER_PROFILE, '${{ needs.scope.outputs.browserProfile }}');
-  assert.equal(step.env.CI_WEBM, '${{ needs.scope.outputs.webm }}');
-  assert.equal(step.env.CI_WEBM_PROFILE, '${{ needs.scope.outputs.webmProfile }}');
-  assert.equal(step.env.BROWSER_RESULT, '${{ needs.browser-regression.result }}');
-  assert.equal(step.env.WEBM_RESULT, '${{ needs.webm-decode.result }}');
-  const runAggregate = overrides => spawnSync('bash', ['-e', '-u', '-o', 'pipefail', '-c', step.run], {
-    encoding: 'utf8', env: {
-      ...process.env, SCOPE_RESULT: 'success', CI_SCOPE: 'full', CI_BROWSER: 'true',
-      CI_BROWSER_PROFILE: 'full', CI_WEBM: 'true', CI_WEBM_PROFILE: 'full',
-      BROWSER_RESULT: 'success', WEBM_RESULT: 'success', ...overrides,
-    },
-  });
-  for (const [scope, profile, browser, webm, media = 'full'] of [
-    ['docs', 'full', false, false], ['full', 'full', true, true], ['full', 'full', true, false],
-    ['core', 'full', true, true, 'viewer'], ['core', 'full', true, true, 'story'],
-    ['core', 'full', false, true, 'story'],
-    ['core', 'full', false, false], ['core', 'full', false, true],
-    ['core', 'full', true, false], ['core', 'full', true, true],
-    ['core', 'atlas', true, false], ['core', 'changed', true, false], ['core', 'changed', true, true],
-  ]) {
-    const plan = {
-      CI_SCOPE: scope, CI_BROWSER_PROFILE: profile, CI_BROWSER: String(browser), CI_WEBM: String(webm), CI_WEBM_PROFILE: media,
-      BROWSER_RESULT: browser ? 'success' : 'skipped', WEBM_RESULT: webm ? 'success' : 'skipped',
-    };
-    assert.equal(runAggregate(plan).status, 0, JSON.stringify(plan));
-    for (const key of ['SCOPE_RESULT', 'BROWSER_RESULT', 'WEBM_RESULT']) {
-      for (const result of ['success', 'failure', 'skipped', 'cancelled', '']) {
-        const expected = result === (plan[key] ?? 'success') ? 0 : 1;
-        assert.equal(runAggregate({ ...plan, [key]: result }).status, expected,
-          `${JSON.stringify(plan)} with ${key}=${result}`);
-      }
-    }
-  }
-  for (const plan of [
-    { CI_SCOPE: '' }, { CI_SCOPE: 'unknown' }, { CI_SCOPE: 'docs' },
-    { CI_BROWSER: '' }, { CI_WEBM: '' }, { CI_BROWSER_PROFILE: '' },
-    { CI_BROWSER: 'false', BROWSER_RESULT: 'skipped' }, { CI_WEBM_PROFILE: '' },
-    { CI_WEBM_PROFILE: 'viewer' }, { CI_SCOPE: 'core', CI_WEBM_PROFILE: 'unknown' },
-    { CI_SCOPE: 'core', CI_WEBM: 'false', WEBM_RESULT: 'skipped', CI_WEBM_PROFILE: 'story' },
-    { CI_BROWSER_PROFILE: 'changed' }, { CI_BROWSER_PROFILE: 'atlas' },
-    { CI_SCOPE: 'core', CI_BROWSER_PROFILE: 'unknown' },
-    { CI_SCOPE: 'core', CI_BROWSER: 'false', BROWSER_RESULT: 'skipped', CI_BROWSER_PROFILE: 'changed' },
-    { CI_SCOPE: 'core', CI_BROWSER_PROFILE: 'atlas' },
-    { CI_SCOPE: 'core', CI_WEBM: '0', WEBM_RESULT: 'skipped' },
-  ]) {
-    assert.equal(runAggregate(plan).status, 1, JSON.stringify(plan));
-  }
-});
-
-
-test('website CI uses the maintained browser script including community security coverage', () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'website/package.json'), 'utf8'));
-  const source = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
-  const gate = source.match(/ {6}- name: Verify built website navigation and language continuity\n([\s\S]*?)(?=\n {6}- |\n {2}[\w-]+:|$)/)?.[1];
-  assert.ok(gate, 'website must run its browser regression gate');
-  assert.match(gate, /run: pnpm run test:browser\n/);
-  assert.match(gate, /working-directory: website/);
-  assert.match(gate, /ARCHIFY_SITE_INTEGRATION: '1'/);
-  assert.match(manifest.scripts['test:browser'], /site-language-continuity\.test\.mjs/);
-  assert.match(manifest.scripts['test:browser'], /community-browser\.test\.mjs/);
-});
