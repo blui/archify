@@ -54,7 +54,7 @@ function setup(t, { file = 'values.csv', kind = 'bar', x = 'name', y = ['value']
     fs.writeFileSync(dataFile, bytes);
     const result = spawnSync(process.execPath, [cli, 'finalize', 'explainer', input, output, '--json'], {
       encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 20_000,
-      env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' },
+      env: { ...process.env },
     });
     assert.ifError(result.error);
     assert.equal(fs.readFileSync(input, 'utf8'), source, '渲染和失败都不能改写作者原稿');

@@ -26,7 +26,7 @@ function run(args, cwd = skillRoot, extraEnv = {}, nodeArgs = []) {
     cwd,
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
-    env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1', ...extraEnv },
+    env: { ...process.env, ...extraEnv },
   });
 }
 

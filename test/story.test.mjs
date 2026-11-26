@@ -22,7 +22,7 @@ function fileSymlink(t,target,file){
     t.skip('File symlinks unavailable: '+error.code);return false;
   }
 }
-function run(args,cwd,entry=cli){return spawnSync(process.execPath,[entry,'story',...args,'--json'],{cwd,encoding:'utf8',env:{...process.env,NODE_PATH:'',ARCHIFY_UPDATE_CHECK_DISABLED:'1'},maxBuffer:8*1024*1024});}
+function run(args,cwd,entry=cli){return spawnSync(process.execPath,[entry,'story',...args,'--json'],{cwd,encoding:'utf8',env:{...process.env,NODE_PATH:''},maxBuffer:8*1024*1024});}
 function brief(facts){const edge=facts.edges[0];return {version:2,title:'Explain the native handoff',intro:'Establish the complete diagram.',outro:'Return to its original context.',scenes:[{title:'Read this relationship',points:[{anchor:edge?.to||facts.nodes[0].id,...(edge?{via:edge.id}:{}),title:'Explain the selected point',text:'Describe the responsibility shown by this source relationship.'}]}]};}
 function embedded(html){return Buffer.from(JSON.parse(/id="archify-story-payload" type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1]).html,'base64').toString('utf8');}
 

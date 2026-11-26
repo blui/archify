@@ -19,7 +19,7 @@ for (const [name, { file, passes, diagnostic, round5Svg, round8Svg, round11Svg, 
     const scratch = mkdtempSync(join(tmpdir(), 'archify-fixed-canvas-'));
     t.after(() => rmSync(scratch, { recursive: true, force: true }));
     const output = join(scratch, 'chart.html');
-    const env = { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' };
+    const env = { ...process.env };
     delete env.ARCHIFY_QUALITY_PROFILE;
     const result = spawnSync(process.execPath, [cli, 'render', 'architecture', fileURLToPath(new URL(file, fixtures)), output], {
       encoding: 'utf8', env,

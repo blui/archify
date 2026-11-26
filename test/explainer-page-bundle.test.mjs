@@ -10,7 +10,7 @@ import { unpackPageBundle } from '../archify/explainer/page-bundle.mjs';
 // #1426: a repository file cited several times is embedded once in the page, and every
 // citation is still verified against the bytes it names.
 const cli = path.resolve('archify/bin/archify.mjs');
-const run = args => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' } });
+const run = args => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env } });
 const payloadPattern = /(<script type="application\/json" id="archify-explainer-prepared">)([\s\S]*?)(<\/script>)/;
 const rawPayload = file => JSON.parse(scanHtml(fs.readFileSync(file, 'utf8')).scripts.find(s => s.attrs.id === 'archify-explainer-prepared').text);
 // An edited copy has no delivery sidecar, so the check judges the page content alone.

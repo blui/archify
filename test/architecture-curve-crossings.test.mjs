@@ -12,7 +12,7 @@ const cli = fileURLToPath(new URL('../archify/bin/archify.mjs', import.meta.url)
 const spec = name => fileURLToPath(new URL(`fixtures/architecture-route-regressions/${name}.json`, import.meta.url));
 const path = d => prepareCrossingPath(analyzeSvgPath(d).subpaths[0].commands);
 const run = (args, overrides = {}) => spawnSync(process.execPath, [cli, ...args], {
-  encoding: 'utf8', env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1', ...overrides },
+  encoding: 'utf8', env: { ...process.env, ...overrides },
 });
 
 function scratch(t) {

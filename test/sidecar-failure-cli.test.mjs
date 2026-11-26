@@ -14,7 +14,7 @@ function fixture(t){
  return {dir,bytes};
 }
 function failedReceipt(args,dir,wrapper){
- const result=spawnSync(process.execPath,wrapper?[wrapper,...args]:[cli,...args],{cwd:dir,encoding:'utf8',timeout:10000,maxBuffer:1048576,env:{...process.env,ARCHIFY_UPDATE_CHECK_DISABLED:'1'}});
+ const result=spawnSync(process.execPath,wrapper?[wrapper,...args]:[cli,...args],{cwd:dir,encoding:'utf8',timeout:10000,maxBuffer:1048576,env:{...process.env}});
  assert.ifError(result.error);assert.equal(result.status,1,result.stderr);
  assert.doesNotMatch(result.stderr,/\n\s+at /u);
  const receipt=JSON.parse(result.stdout);assert.equal(receipt.ok,false);

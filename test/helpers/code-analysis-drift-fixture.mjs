@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const cli = fileURLToPath(new URL('../../archify/bin/archify.mjs', import.meta.url));
-const env = { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' };
+const env = { ...process.env };
 function run(cwd, file, args) {
   return spawnSync(file, args, { cwd, env, encoding: 'utf8', timeout: 120_000, windowsHide: true });
 }

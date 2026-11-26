@@ -17,12 +17,9 @@ import {
   persistBrowserCheckFailure,
   VISUAL_CHECK_VIEWPORTS,
 } from './visual-check.mjs';
-import { startDeliveryUpdateCheck } from './delivery-update.mjs';
-import { UPDATE_NOTICE_ENV, resolveUpdateNotice } from './update-notice.mjs';
 import { declaredExplainerInputPaths } from '../explainer/prepare.mjs';
 
 export const FINALIZE_STAGES = Object.freeze(['validate', 'deliver', 'check', 'browser-check']);
-const FINALIZE_UPDATE_DEADLINE_MS = 4_000;
 
 function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
@@ -907,8 +904,6 @@ export async function runFinalize({
   candidateSha256,
   preparedExplainer,
   browserCheck = false,
-  updateNotice = true,
-  resolveNotice = resolveUpdateNotice,
   outDir,
   receiptPath,
   deliveryPaths = defaultDeliveryPaths,
@@ -917,7 +912,6 @@ export async function runFinalize({
   env = process.env,
   runCommand = defaultRunner,
   runBrowserCheck,
-  startUpdateCheck = startDeliveryUpdateCheck,
   checkMissingAnalysisDependencies = getMissingAnalysisDependencies,
   resolveChrome = findChrome,
   createBrowser = (chromePath, options) => new ChromeVisualBrowser(chromePath, options),
@@ -1005,19 +999,6 @@ export async function runFinalize({
     summaryCapture = writeJsonAtomic(resolvedSummary, compactFinalizeReceipt(receipt), summaryCapture, assertReceiptPaths);
   };
   persistReceipts();
-  // The gates below usually take seconds, so a slower network can finish the
-  // update check in parallel instead of timing out on every delivery.
-  const updateCheck = startUpdateCheck({ env, deadlineMs: needsBrowser ? FINALIZE_UPDATE_DEADLINE_MS : 200 });
-  // The deliver stage's own network check is disabled above, so read the
-  // cached notice here with the caller's environment and hand it down.
-  const deliverEnv = { ...env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' };
-  delete deliverEnv[UPDATE_NOTICE_ENV];
-  try {
-    const notice = await resolveNotice({ env, optOut: !updateNotice });
-    if (notice) deliverEnv[UPDATE_NOTICE_ENV] = JSON.stringify(notice);
-  } catch {
-    // The page notice is optional and never blocks delivery.
-  }
 
   // Resolve and launch Chrome only after delivery and strict artifact checks pass.
   // Invalid candidates must not start a browser that cannot inspect an artifact.
@@ -1108,7 +1089,7 @@ export async function runFinalize({
           result = { status: checked.exitCode, stdout: JSON.stringify(checked.receipt) };
         } else {
           result = await runCommand({ stage, cliPath, args, cwd,
-            env: stage === 'deliver' ? deliverEnv : env });
+            env });
         }
         if (preparedExplainer && result.status === 0) {
           try {
@@ -1310,7 +1291,6 @@ export async function runFinalize({
       : identity(resolvedOutput);
     receipt.finishedAt = new Date().toISOString();
     receipt.durationMs = durationMs(started);
-    receipt.update = await updateCheck;
     persistReceipts();
     return { exitCode, receipt, summary: compactFinalizeReceipt(receipt) };
   } catch (error) {
@@ -1319,6 +1299,5 @@ export async function runFinalize({
     throw error;
   } finally {
     if (browser && !browserTransferred) await browser.close();
-    await updateCheck;
   }
 }

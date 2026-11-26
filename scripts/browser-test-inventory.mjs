@@ -66,5 +66,4 @@ export const browserTestFiles = [
   'export-svg-delivery.test.mjs',
   // Benchmark observers and real export integration require this explicit Chrome lane.
   'node-index-route-browser.test.mjs',
-  'update-notice-browser.test.mjs',
 ];

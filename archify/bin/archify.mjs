@@ -2214,9 +2214,9 @@ const COMMAND_USAGE = {
   ],
   render: '<type> <input.json> [output.html] [--quality standard|showcase] [--repo-root path]',
   compare: 'architecture <base.json> <head.json> [output.html] [--receipt path] [--json] [--quality standard|showcase] [--repo-root path]',
-  deliver: '<type> <input.json> [output.html] [--json] [--open] [--no-update-notice] [--quality standard|showcase] [--repo-root path]',
+  deliver: '<type> <input.json> [output.html] [--json] [--open] [--quality standard|showcase] [--repo-root path]',
   patch: 'explainer <artifact.html> <panel-id> <replacement-file> <output.html> [--json] [--quality standard|showcase] [--repo-root path]',
-  finalize: '<type> <input.json> <output.html> [--json] [--browser-check] [--no-update-notice] [--receipt path] [--out-dir <dir>] [--quality standard|showcase] [--repo-root path] [--candidate-sha256 hex]',
+  finalize: '<type> <input.json> <output.html> [--json] [--browser-check] [--receipt path] [--out-dir <dir>] [--quality standard|showcase] [--repo-root path] [--candidate-sha256 hex]',
   preview: '<type> <input.json> [output.html] [--no-open] [--quality standard|showcase] [--repo-root path]',
   validate: '<type> <input.json> [--json] [--layout-json] [--quality standard|showcase] [--repo-root path]',
   'export-svg': '<type> <input.json> <output.svg|stem> [--theme both|light|dark] [--preset name] [--animate-flow] [--json] [--quality standard|showcase] [--repo-root path]',
@@ -4488,8 +4488,7 @@ async function commandDeliver(args) {
   repoArgs.rest = writingArgs.rest;
   const json = repoArgs.rest.includes('--json');
   const open = repoArgs.rest.includes('--open');
-  const noUpdateNotice = repoArgs.rest.includes('--no-update-notice');
-  const knownOptions = new Set(['--json', '--open', '--no-update-notice']);
+  const knownOptions = new Set(['--json', '--open']);
   const unknown = repoArgs.rest.filter((arg) => arg.startsWith('--') && !knownOptions.has(arg));
   if (unknown.length) rejectCliArgument(`Unknown deliver option "${unknown[0]}".`, {
     code: 'cli/unknown-option',
@@ -4528,7 +4527,6 @@ async function commandDeliver(args) {
     releaseRegularFileBinding,
   };
   const receiptId = randomUUID();
-  let updateCheck;
   let deliveryOwnership;
   let recoveryRequired = false;
   let stagingDirectory;
@@ -4561,7 +4559,6 @@ async function commandDeliver(args) {
     deliveryOwnership = undefined;
     const recorded = writeDeliveryFailureReceipt({
       ...options,
-      ...(updateCheck ? { update: await updateCheck } : {}),
       pathsAlias,
       receiptId,
       ownership,
@@ -4576,10 +4573,7 @@ async function commandDeliver(args) {
       recoveryRequired = true;
     }
   };
-  const reportPreparedArtifactFailure = async (options) => reportArtifactFailure({
-    ...options,
-    ...(updateCheck ? { update: await updateCheck } : {}),
-  });
+  const reportPreparedArtifactFailure = async (options) => reportArtifactFailure(options);
   const inputPath = path.resolve(input);
   let specification;
   let diagram;
@@ -4758,8 +4752,6 @@ async function commandDeliver(args) {
     outputPath = artifactCapture.commitPath;
     provenancePath = provenanceCapture.commitPath;
     outputDirectory = path.dirname(outputPath);
-    const { startDeliveryUpdateCheck } = await import('./delivery-update.mjs');
-    updateCheck = startDeliveryUpdateCheck();
   } catch (error) {
     await reportPreparedArtifactFailure({
       command: 'deliver', json, stage: 'prepare', type, input: inputPath, output: outputPath, receiptId,
@@ -5007,31 +4999,6 @@ async function commandDeliver(args) {
     if (render.stderr) process.stderr.write(render.stderr);
     const localeWarnings = [...await specificationLocaleDiagnostics(type, specification), ...(explainerBundle?.diagnostics.filter(entry => entry.severity === 'warning') || [])];
     for (const warning of localeWarnings) process.stderr.write(`archify: ${warning.message}\n`);
-    // An outdated installation adds a small local notice to the page before
-    // the artifact check, so the check, receipt hash, and provenance all bind
-    // the bytes that are delivered. Any failure leaves the page unchanged.
-    let updateNotice = null;
-    const noticeCandidatePath = `${candidatePath}.update-notice`;
-    try {
-      const { injectUpdateNotice, resolveUpdateNotice } = await import('./update-notice.mjs');
-      const notice = await resolveUpdateNotice({ optOut: noUpdateNotice });
-      if (notice) {
-        const injected = injectUpdateNotice(fs.readFileSync(candidatePath, 'utf8'), notice);
-        if (injected.embedded) {
-          fs.writeFileSync(noticeCandidatePath, injected.html, { flag: 'wx' });
-          fs.renameSync(noticeCandidatePath, candidatePath);
-          updateNotice = {
-            embedded: true,
-            installedVersion: notice.installedVersion,
-            availableVersion: notice.availableVersion,
-          };
-        }
-      }
-    } catch {
-      // The notice is optional; the rendered candidate is still checked below.
-      updateNotice = null;
-      try { fs.rmSync(noticeCandidatePath, { force: true }); } catch {}
-    }
     try {
       const renderedCandidate = fs.readFileSync(candidatePath);
       if (preparedDeliveryTargets.artifact.mode !== null) {
@@ -5188,7 +5155,6 @@ async function commandDeliver(args) {
         },
       } : {}),
       ...(localeWarnings.length ? { diagnostics: localeWarnings } : {}),
-      ...(updateNotice ? { updateNotice } : {}),
     };
 
     const provenanceBytes = Buffer.from(`${JSON.stringify(deliverySuccessProvenance(receipt), null, 2)}\n`);
@@ -5393,8 +5359,6 @@ async function commandDeliver(args) {
         console.error(`Could not open the verified artifact (${receipt.open.status}). ${receipt.open.failure?.reason || 'Open it manually.'} Target: ${outputPath}`);
       }
     }
-
-    receipt.update = await updateCheck;
 
     if (json) {
       console.log(JSON.stringify(receipt, null, 2));
@@ -6050,7 +6014,7 @@ async function commandFinalize(rawArgs) {
   const writingArgs = extractExplainerWritingArgs(candidateArgs.rest);
   candidateArgs.rest = writingArgs.rest;
   const json = candidateArgs.rest.includes('--json');
-  const knownOptions = new Set(['--json','--browser-check','--no-update-notice']);
+  const knownOptions = new Set(['--json','--browser-check']);
   const unknown = candidateArgs.rest.filter((arg) => arg.startsWith('--') && !knownOptions.has(arg));
   if (unknown.length) rejectCliArgument(`Unknown finalize option "${unknown[0]}".`, {
     code: 'cli/unknown-option',
@@ -6095,7 +6059,6 @@ async function commandFinalize(rawArgs) {
       repoRoot: repoArgs.repoRoot,
       writingMode: writingArgs.writingMode,
       browserCheck: candidateArgs.rest.includes('--browser-check'),
-      updateNotice: !candidateArgs.rest.includes('--no-update-notice'),
       candidateSha256: candidateArgs.candidateSha256,
       outDir: outDirArgs.outDir,
       receiptPath: receiptArgs.receiptPath,

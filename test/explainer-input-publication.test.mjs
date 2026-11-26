@@ -16,7 +16,7 @@ function fixture(t, dependency, invalid = false) {
   const bytes = invalid ? data.replace('60','"invalid"') : data;
   fs.mkdirSync(path.dirname(path.join(dir, dependency)), { recursive: true });
   fs.writeFileSync(path.join(dir,dependency),bytes);
-  return {dir,bytes,run(command,extra=[]) {return spawnSync(process.execPath,[cli,command,'explainer','draft.json','page.html','--json',...extra],{cwd:dir,encoding:'utf8',timeout:30000,env:{...process.env,ARCHIFY_UPDATE_CHECK_DISABLED:'1'}});}};
+  return {dir,bytes,run(command,extra=[]) {return spawnSync(process.execPath,[cli,command,'explainer','draft.json','page.html','--json',...extra],{cwd:dir,encoding:'utf8',timeout:30000,env:{...process.env}});}};
 }
 for (const [command,dependency,extra] of [
   ['deliver','page.delivery.json',[]],
@@ -129,7 +129,7 @@ test('a rejected prepared patch input never publishes over its original dependen
   fs.writeFileSync(input, JSON.stringify(draft));
   const original = path.join(f.dir, 'original.html');
   const delivered = spawnSync(process.execPath, [cli, 'deliver', 'explainer', input, original, '--json'], {
-    cwd: f.dir, encoding: 'utf8', env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' },
+    cwd: f.dir, encoding: 'utf8', env: { ...process.env },
   });
   assert.equal(delivered.status, 0, delivered.stdout + delivered.stderr);
   const originalBytes = fs.readFileSync(original);
@@ -152,7 +152,7 @@ syncBuiltinESMExports();
 process.argv = [process.execPath, ${JSON.stringify(cli)}, 'patch', 'explainer', ${JSON.stringify(original)}, 'data', ${JSON.stringify(replacement)}, ${JSON.stringify(output)}, '--json'];
 await import(${JSON.stringify(pathToFileURL(cli).href)});`);
   const result = spawnSync(process.execPath, [wrapper], { cwd: f.dir, encoding: 'utf8', timeout: 30_000,
-    env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' } });
+    env: { ...process.env } });
   assert.notEqual(result.status, 0);
   const receipt = JSON.parse(result.stdout);
   assert.ok(receipt.diagnostics.some(entry => entry.code === 'explainer/dependency-changed'));
@@ -168,7 +168,7 @@ test('an invalid prepared bundle preserves existing evidence and its typed error
   fs.writeFileSync(path.join(f.dir, 'page.html'), 'previous HTML');
   fs.writeFileSync(path.join(f.dir, 'page.delivery.json'), 'previous evidence');
   const result = spawnSync(process.execPath, [cli, 'deliver', 'explainer', 'draft.json', 'page.html', '--json'], {
-    cwd: f.dir, encoding: 'utf8', env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1', ARCHIFY_EXPLAINER_PREPARED: prepared },
+    cwd: f.dir, encoding: 'utf8', env: { ...process.env, ARCHIFY_EXPLAINER_PREPARED: prepared },
   });
   assert.notEqual(result.status, 0);
   assert.ok(JSON.parse(result.stdout).diagnostics.some(entry => entry.code === 'explainer/prepared-invalid'));

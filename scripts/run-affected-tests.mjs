@@ -110,7 +110,6 @@ if (process.argv[1] && sameEntry(process.argv[1], fileURLToPath(import.meta.url)
     if (result.error) throw result.error;
     if (result.signal || result.status !== 0) process.exit(result.status || 1);
   };
-  if (owners.some(owner => ['readme', 'changelog'].includes(owner))) run(['scripts/check-release-identity.mjs']);
   if (owners.includes('readme')) {
     // This consumer reads the README directly; the other cases need an Astro build.
     run(['--test', '--test-name-pattern=READMEs', 'test/automatic-port-spread.test.mjs',

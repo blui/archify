@@ -16,5 +16,5 @@ test('default and compatibility share the real public CLI core while full discov
 
 test('generated checks have one explicit entrypoint separate from core feedback', () => {
   const checks = manifest.scripts['test:generated'];
-  for (const required of ['check:viewer', 'check:brand-marks', 'check:validators', 'check:release-identity', 'test/golden.mjs']) assert.ok(checks.includes(required));
+  for (const required of ['check:viewer', 'check:brand-marks', 'check:validators', 'test/golden.mjs']) assert.ok(checks.includes(required));
 });

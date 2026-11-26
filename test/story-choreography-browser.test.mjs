@@ -22,7 +22,7 @@ function run(args, cwd = skillRoot) {
     cwd,
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
-    env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1' },
+    env: { ...process.env },
   });
 }
 

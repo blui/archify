@@ -34,7 +34,7 @@ test('pinned PR workbench exposes a new mapped dependency and its head import wi
   const run = spawnSync(process.execPath, [cli, 'code-analysis', 'prepare', f.repo,
     '--base', f.base, '--head', f.head, '--ir', f.ir, '--map', f.map,
     '--language', 'ts', '--out', out], {
-    env: { ...process.env, ARCHIFY_UPDATE_CHECK_DISABLED: '1', GIT_ALLOW_PROTOCOL: '' },
+    env: { ...process.env, GIT_ALLOW_PROTOCOL: '' },
     encoding: 'utf8', windowsHide: true, timeout: 90000,
   });
   assert.equal(run.status, 0, run.stdout + run.stderr);

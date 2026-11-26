@@ -10,7 +10,6 @@ import {
   sameLocation,
   sidecarNamespaceComponentKey,
 } from '../archify/renderers/shared/path-semantics.mjs';
-import { checkForUpdate } from '../archify/scripts/check-update.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillRoot = path.join(repoRoot, 'archify');
@@ -325,31 +324,6 @@ async function runControlledWindowsPathE2E() {
     requireSuccess('architecture compare to extended UNC', compared);
     assert.equal(JSON.parse(compared.stdout).ok, true);
     assert.ok(fs.existsSync(path.win32.join(uncRoot, path.win32.basename(compareOutput))));
-
-    const localRelease = JSON.parse(fs.readFileSync(path.join(skillRoot, 'skill-release.json'), 'utf8'));
-    localRelease.channel = 'stable';
-    localRelease.version = '2.15.0';
-    const releasePath = path.join(caseRoot, `${token}-skill-release.json`);
-    fs.writeFileSync(releasePath, `${JSON.stringify(localRelease)}\n`);
-    const stableManifest = fs.readFileSync(
-      path.join(repoRoot, 'docs', 'skill-updates', 'archify', 'stable.json'),
-      'utf8',
-    );
-    const updateCache = path.win32.join(eightDotThreeShortRoot, `${token}-update-cache`);
-    const update = await checkForUpdate({
-      releasePath,
-      cacheDirectory: updateCache,
-      fetchImpl: async () => new Response(stableManifest, {
-        status: 200,
-        headers: {
-          'content-type': 'application/json',
-          etag: `"${token}"`,
-        },
-      }),
-      now: () => Date.parse('2026-09-18T12:00:00Z'),
-      random: () => 0.5,
-    });
-    assert.equal(update.status, 'update_available');
 
     let ordinaryLongDirectory = uncRoot;
     for (let index = 0; ordinaryLongDirectory.length <= 320; index += 1) {
