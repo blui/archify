@@ -66,19 +66,16 @@ test('Atlas-only changes keep CLI, overlay, browser and package checks without u
     assert.equal(mixed.scope, 'full', extra);
     assert.equal(mixed.browserProfile, 'full', extra);
   }
-  assert.equal(classifyPaths(['test/story-browser.test.mjs']).webm, true);
 });
 
 test('independent browser test edits run the exact suites once with their owned runtime', () => {
   const i18n = 'test/i18n-browser.test.mjs';
   const desktop = 'test/desktop-reader-browser.test.mjs';
-  const story = 'test/story-browser.test.mjs';
   const browserGate = 'test/browser-gate.test.mjs';
-  const available = [i18n, desktop, story, browserGate];
+  const available = [i18n, desktop, browserGate];
   for (const [files, expectedBrowser, expectedWebm] of [
     [[i18n], [i18n], false],
-    [[story], [], true],
-    [[i18n, desktop, story], [i18n, desktop], true],
+    [[i18n, desktop], [i18n, desktop], false],
   ]) {
     const plan = classifyPaths(files);
     assert.equal(plan.scope, 'core');
@@ -86,7 +83,7 @@ test('independent browser test edits run the exact suites once with their owned 
     assert.equal(plan.browser, expectedBrowser.length > 0);
     assert.deepEqual(plan.browserTests, expectedBrowser);
     assert.equal(plan.webm, expectedWebm);
-    assert.equal(plan.webmProfile, expectedWebm ? 'story' : 'full');
+    assert.equal(plan.webmProfile, 'full');
     assert.deepEqual(selectAffectedTests(plan.owners, plan.changedTests, available), [browserGate]);
   }
 
@@ -100,24 +97,23 @@ test('independent browser test edits run the exact suites once with their owned 
   }
 });
 
-test('Viewer interaction changes keep artifact coverage and use Chrome for Story', () => {
+test('Viewer interaction changes keep artifact coverage', () => {
   const source = 'viewer/route-probe.js';
   const template = 'archify/assets/template.html';
-  const storyGolden = 'examples/workflow-agent-tool-call-rendered.html';
-  const rebuilt = [source, template, storyGolden, 'archify.zip', 'examples/checkout-platform-delta.html'];
+  const golden = 'examples/workflow-agent-tool-call-rendered.html';
+  const rebuilt = [source, template, golden, 'archify.zip', 'examples/checkout-platform-delta.html'];
   for (const paths of [[source], rebuilt]) {
     const plan = classifyPaths(paths);
     assert.equal(plan.scope, 'core');
     assert.ok(plan.generated && plan.browser && plan.webm && plan.package);
     assert.equal(plan.webmProfile, 'viewer');
   }
-  const treeOnly = classifyPaths(['viewer/tree-branches.js', template, storyGolden, 'archify.zip']);
+  const treeOnly = classifyPaths(['viewer/tree-branches.js', template, golden, 'archify.zip']);
   assert.ok(treeOnly.generated && treeOnly.browser && treeOnly.package);
   assert.equal(treeOnly.webm, false);
   for (const extra of ['viewer/viewer.css', 'viewer/export.js', 'viewer/motion-governor.js',
     'archify/renderers/workflow/render-workflow.mjs', 'archify/examples/agent-tool-call.workflow.json',
-    'archify/story/story-export.js', 'test/story-browser.test.mjs', 'test/fixtures/unknown.json',
-    'archify/assets/generated-unknown.js']) {
+    'test/fixtures/unknown.json', 'archify/assets/generated-unknown.js']) {
     const mixed = classifyPaths([...rebuilt, extra]);
     assert.ok(mixed.webm, extra);
     assert.equal(mixed.webmProfile, 'full', extra);
@@ -125,18 +121,13 @@ test('Viewer interaction changes keep artifact coverage and use Chrome for Story
   const unattributed = classifyPaths([template, 'archify.zip']);
   assert.ok(unattributed.webm && unattributed.generated);
   assert.equal(unattributed.webmProfile, 'full');
-  assert.equal(classifyPaths([storyGolden]).webmProfile, 'story');
 });
 
-test('media fixtures and Story inputs select the check that reads them', () => {
+test('media fixtures select the check that reads them', () => {
   for (const [source, profile] of [
-    ['archify/story/story-container.js', 'story'],
-    ['archify/renderers/shared/svg-bake.mjs', 'story'],
-    ['archify/schemas/story-choreography.schema.json', 'story'],
     ['examples/checkout-platform-delta.html', 'viewer'],
     ['docs/gallery/artifacts/production-deployment.architecture.html', 'viewer'],
     ['archify/examples/agent-tool-call.workflow.json', 'full'],
-    ['archify/examples/checkout-request.waterfall.json', 'story'],
   ]) {
     const plan = classifyPaths([source]);
     assert.ok(plan.webm, source);
@@ -157,7 +148,7 @@ test('independent product areas keep broader regressions while omitting both med
     assert.ok(plan.generated && plan.browser && plan.package && plan.windows);
     assert.equal(plan.webm, false);
     assert.equal(plan.webmProfile, 'full');
-    for (const extra of ['archify/assets/template.html', 'archify/story/story-export.js', 'test/fixtures/new.json',
+    for (const extra of ['archify/assets/template.html', 'test/fixtures/new.json',
       'package.json', '.github/workflows/ci.yml', 'unknown.txt']) {
       const mixed = classifyPaths([...paths, extra]);
       assert.ok(mixed.webm, extra);
@@ -219,14 +210,6 @@ test('five README languages and changelog use documentation checks and preserve 
   for (const file of ['README_FR.md', 'CHANGELOG_ZH.md', 'archify/README.md']) assert.equal(classifyPaths([file]).scope, 'full', file);
 });
 
-test('Story filesystem and process owners retain full regression and Windows gates', () => {
-  for (const file of ['output.mjs', 'tool.mjs', 'cli.mjs', 'choreography-plan.mjs']) {
-    const plan = classifyPaths([`archify/story/${file}`]);
-    assert.equal(plan.scope, 'full', file);
-    assert.equal(plan.windows, true, file);
-  }
-});
-
 test('recipe, schema and shared renderer owners include their real source consumers', () => {
   const available = ['test/guide.test.mjs', 'test/guide-page.test.mjs', 'test/gallery.test.mjs', 'test/start-page.test.mjs', 'test/engineering-profile.test.mjs', 'test/legend-contract.test.mjs', 'test/generate-validators.test.mjs'];
   const recipe = classifyPaths(['archify/recipes/scenarios.mjs']);
@@ -240,12 +223,6 @@ test('recipe, schema and shared renderer owners include their real source consum
   const schema = classifyPaths(['archify/schemas/workflow.schema.json']);
   assert.equal(schema.scope, 'core');
   assert.ok(selectAffectedTests(schema.owners, [], available).includes('test/generate-validators.test.mjs'));
-  const storySchema = classifyPaths(['archify/schemas/story-choreography.schema.json']);
-  assert.equal(storySchema.scope, 'core');
-  assert.ok(storySchema.owners.includes('schema') && storySchema.generated && storySchema.browser && storySchema.package);
-  const storyMod = classifyPaths(['archify/story/story-svg.mjs']);
-  assert.equal(storyMod.scope, 'core');
-  assert.ok(storyMod.owners.includes('viewer') && storyMod.generated && storyMod.browser && storyMod.webm && storyMod.package);
 });
 
 test('shared SVG parser changes retain the public checker suite without selecting unrelated tests', () => {
@@ -282,13 +259,13 @@ test('review export and PR pack changes retain their offline, export and sandbox
   assert.equal(guide.website, false);
 });
 
-test('the shared SVG baker runs both PR export and Story regression gates', () => {
+test('the shared SVG baker runs the PR export and Viewer regression gates', () => {
   const plan = classifyPaths(['archify/renderers/shared/svg-bake.mjs', 'archify.zip']);
   assert.equal(plan.scope, 'core');
   assert.deepEqual(plan.owners, ['pr', 'viewer']);
-  assert.ok(plan.generated && plan.browser && plan.webm && plan.package);
-  const affected = ['test/pr-pack.test.mjs', 'test/svg-bake.test.mjs', 'test/story-choreography.test.mjs',
-    'test/story-choreography-browser.test.mjs'];
+  assert.ok(plan.generated && plan.browser && plan.package);
+  assert.equal(plan.webm, false);
+  const affected = ['test/pr-pack.test.mjs', 'test/svg-bake.test.mjs'];
   assert.deepEqual(selectAffectedTests(plan.owners, [], [...affected, 'test/cli.test.mjs']), affected.sort());
 });
 

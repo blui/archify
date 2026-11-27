@@ -8,19 +8,16 @@ import { fileURLToPath } from 'node:url';
 import { findChrome } from '../archify/bin/visual-check.mjs';
 import { testRunnerOptions } from './test-runner-options.mjs';
 
-import { browserTestFiles, storyMediaBrowserTest } from './browser-test-inventory.mjs';
+import { browserTestFiles } from './browser-test-inventory.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 let options;
 try {
   const profile = process.env.CI_BROWSER_PROFILE ?? 'full';
-  const storyOwner = process.env.CI_STORY_BROWSER_OWNER ?? 'browser';
   if (!['full', 'atlas', 'changed'].includes(profile)) throw new Error(`Unknown browser test profile: ${profile}`);
-  if (!['browser', 'webm'].includes(storyOwner)) throw new Error(`Unknown Story browser test owner: ${storyOwner}`);
   let testFiles = browserTestFiles.filter(filename =>
-    (profile !== 'atlas' || filename.startsWith('code-analysis-')) &&
-    (storyOwner === 'browser' || filename !== storyMediaBrowserTest));
+    profile !== 'atlas' || filename.startsWith('code-analysis-'));
   if (profile === 'changed') {
     const changed = JSON.parse(process.env.CI_BROWSER_TESTS ?? '[]');
     const available = new Set(testFiles.map(file => `test/${file}`));

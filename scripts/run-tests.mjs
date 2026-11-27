@@ -18,7 +18,7 @@ const testFiles = fs.readdirSync(testRoot)
 // hint only: discovery still supplies every file, including new suites.
 const shardFirst = new Set([
   'architecture-delta', 'cli-delivery-lock', 'cli', 'dataflow-automatic-layout',
-  'i18n', 'output-path', 'repository-evidence-types', 'story',
+  'i18n', 'output-path', 'repository-evidence-types',
 ].map(name => path.join('test', `${name}.test.mjs`)));
 
 let options;

@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { browserTestFiles, storyMediaBrowserTest } from './browser-test-inventory.mjs';
+import { browserTestFiles } from './browser-test-inventory.mjs';
 
 const modes = 'architecture|workflow|sequence|dataflow|lifecycle|erd|class|tree|timeline|waterfall';
 const rendererPath = new RegExp(`^archify/(?:renderers/(${modes})/|schemas/(${modes})\\.schema\\.json$)`);
@@ -14,32 +14,18 @@ const atlasGuide = 'archify/modules/code-analysis/docs/USAGE.md';
 const rootTest = /^test\/[^/]+\.test\.mjs$/;
 const maintainedBrowserTests = new Set(browserTestFiles.map(name => `test/${name}`));
 const browserGateTest = 'test/browser-gate.test.mjs';
-const storyTest = `test/${storyMediaBrowserTest}`;
 const viewerTemplate = 'archify/assets/template.html';
 const atlasBrowserTest = name => name.startsWith('test/code-analysis-') && maintainedBrowserTests.has(name);
 const sharedSvgBaker = 'archify/renderers/shared/svg-bake.mjs';
 const explainerBrowserTest = 'test/explainer-browser.test.mjs';
 const explainerPresentation = /^archify\/explainer\/(?:browser-check\.mjs|diagrams\.mjs|layout\.mjs|reader\.(?:css|js)|render\.mjs|writing\.mjs)$/;
 const gates = ['generated', 'browser', 'webm', 'package', 'windows', 'manifest', 'website'];
-const storyPresentationFiles = new Set([
-  'component-stage.mjs', 'story-svg.mjs', 'svg-bake.mjs', 'story-stage-html.mjs', 'story-plan.mjs',
-  'story.js', 'story.css', 'story-attachment.js', 'story-attachment.css', 'story-audio.js',
-  'story-container.js', 'story-export.js', 'story-stage-runtime.js', 'native-motion.js',
-]);
-// Story's offline renderer uses authored SVG, styles and the motion governor.
-// Native reader interactions are still tested by the ordinary Story browser
-// suite when only the Viewer recording and artifact checks need FFmpeg.
 const viewerInteraction = /^viewer\/(?:focus|intent-trace|node-finder|node-outline|route-probe|semantic-lens)\.js$/;
 const viewerWithoutMedia = new Set(['viewer/README.md', 'viewer/tree-branches.js']);
 const viewerMediaFixtures = new Set([
   'docs/gallery/artifacts/production-deployment.architecture.html', 'examples/checkout-platform-delta.html',
   'archify/examples/web-app.architecture.json', 'archify/examples/cache-miss-request.sequence.json',
   'archify/examples/product-analytics.dataflow.json', 'archify/examples/agent-run.lifecycle.json',
-]);
-// Both committed Story HTML fixtures are compared against the current renderer
-// and their input in test:generated, even when this job only runs Viewer media.
-const storyGoldenFixtures = new Set([
-  'examples/waterfall-checkout-request-rendered.html', 'examples/workflow-agent-tool-call-rendered.html',
 ]);
 
 function viewerRebuildCompanion(name) {
@@ -81,12 +67,9 @@ export function classifyPaths(paths) {
     if (name === 'archify.zip') { archiveChanged = true; plan.package = true; continue; }
     if (viewerMediaFixtures.has(name)) media.add('viewer');
     if (name === 'archify/examples/agent-tool-call.workflow.json') media.add('full');
-    if (name === 'archify/examples/checkout-request.waterfall.json' ||
-        (storyGoldenFixtures.has(name) && !viewerRebuild)) media.add('story');
     if (rootTest.test(name)) {
       plan.changedTests.push(name);
       if (name === 'test/repository-evidence-replacement.test.mjs' || name === 'test/cli-delivery-lock.test.mjs') plan.windows = true;
-      if (name === storyTest) media.add('story');
       if (name === 'test/site-language-continuity.test.mjs') plan.website = true;
       if (maintainedBrowserTests.has(name) || name.endsWith('-browser.test.mjs')) {
         plan.browser = true;
@@ -133,14 +116,6 @@ export function classifyPaths(paths) {
       plan.generated = plan.browser = plan.package = true;
       continue;
     }
-    if (name === 'archify/schemas/story-choreography.schema.json') {
-      media.add('story');
-      own('schema'); plan.generated = plan.browser = plan.package = true; continue;
-    }
-    if (name.startsWith('archify/story/') && storyPresentationFiles.has(name.slice('archify/story/'.length))) {
-      media.add('story');
-      own('viewer'); plan.generated = plan.browser = plan.package = true; continue;
-    }
     if (name.startsWith('archify/renderers/shared/') && renderShared.test(name.slice('archify/renderers/shared/'.length))) {
       sharedRenderChanged = true;
       own('renderer'); plan.generated = plan.browser = plan.package = true; continue;
@@ -148,7 +123,6 @@ export function classifyPaths(paths) {
     if (reviewExport.test(name)) {
       own('pr'); plan.browser = plan.package = true;
       if (name === sharedSvgBaker) {
-        media.add('story');
         own('viewer'); plan.generated = true;
       }
       continue;
@@ -188,7 +162,7 @@ export function classifyPaths(paths) {
   } else if (paths.every(name => maintainedBrowserTests.has(name))) {
     // These suites also run their Node-only cases with Chrome available.
     plan.changedTests = [browserGateTest];
-    plan.browserTests = paths.filter(name => name !== storyTest); // test:webm runs Story with FFmpeg.
+    plan.browserTests = paths;
     plan.browser = plan.browserTests.length > 0;
     if (plan.browser) plan.browserProfile = 'changed';
   } else if (paths.some(name => atlasClient.test(name)) &&

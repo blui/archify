@@ -4,14 +4,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { sameEntry } from '../archify/renderers/shared/path-semantics.mjs';
-import { browserTestFiles, storyMediaBrowserTest } from './browser-test-inventory.mjs';
+import { browserTestFiles } from './browser-test-inventory.mjs';
 import { classifyPaths } from './ci-scope.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const mode = /^(architecture|workflow|sequence|dataflow|lifecycle|erd|class|tree|timeline|waterfall)-/;
 // A few broad ownership families, not a source-to-test dependency graph.
 const shared = /^(geometry|spatial-grid|svg-path-(?:analysis|checker)|layout-rules|engineering-profile|legend-contract|render-|renderer-(?:diagnostic|import)|route-|authored-|spread-|text-|base-input-|v1-|brand-|semantic-legend|automatic-port-spread|edge-label-color|label-clearance|vertical-edge|node-icons|change-marks)/;
-const viewer = /^(viewer-|reader-|desktop-|semantic-|finder|focus|intent-|crossover-|animation|export-|motion-|offline-|i18n|relationship-|share-|reach-|presentation|story-)/;
+const viewer = /^(viewer-|reader-|desktop-|semantic-|finder|focus|intent-|crossover-|animation|export-|motion-|offline-|i18n|relationship-|share-|reach-|presentation)/;
 export function selectAffectedTests(owners, changed, available) {
   if (!Array.isArray(owners) || !Array.isArray(changed)) throw new Error('CI test selection must contain arrays');
   const allowed = new Set(['renderer', 'viewer', 'authoring', 'schema', 'pr', 'atlas', 'site', 'artifact', 'delta', 'readme', 'llms', 'changelog', 'policy', 'readme-assets', 'explainer', 'architecture', 'workflow', 'sequence', 'dataflow', 'lifecycle', 'erd', 'class', 'tree', 'timeline', 'waterfall']);
@@ -121,19 +121,16 @@ if (process.argv[1] && sameEntry(process.argv[1], fileURLToPath(import.meta.url)
   }
   if (files.length) run(['scripts/run-tests.mjs', ...files]);
   if (plan) {
-    const story = `test/${storyMediaBrowserTest}`;
-    const browser = plan.browserFiles.filter(file => file !== story);
+    const browser = plan.browserFiles;
     if (browser.length) run(['scripts/run-browser-tests.mjs', ...browser], {
-      ...process.env, CI_BROWSER_PROFILE: 'full', CI_STORY_BROWSER_OWNER: 'browser',
+      ...process.env, CI_BROWSER_PROFILE: 'full',
     });
-    if (plan.browserFiles.includes(story)) run(['test/webm-artifact.smoke.mjs', 'story']);
     if (!checks) {
       console.error('No runnable local checks for these paths. Use the applicable checks under Choose evidence by impact in CONTRIBUTING.md.');
       process.exit(1);
     }
     const extra = ['generated', 'browser', 'webm', 'package', 'windows', 'manifest', 'website']
-      .filter(gate => plan[gate] && !(gate === 'browser' && plan.browserProfile === 'changed') &&
-        !(gate === 'webm' && plan.webmProfile === 'story' && plan.browserFiles.includes(story)));
+      .filter(gate => plan[gate] && !(gate === 'browser' && plan.browserProfile === 'changed'));
     if (plan.scope === 'core' && plan.compatibility) extra.unshift('core smoke');
     if (extra.length) console.log(`CI also selects ${extra.join(', ')}.`);
   } else if (!checks) {

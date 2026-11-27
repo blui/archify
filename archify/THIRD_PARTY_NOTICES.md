@@ -77,12 +77,12 @@ owners. This notice records provenance and known terms; it does not grant rights
 that Archify does not hold, and it does not state that every packaged mark has
 been cleared for every commercial, promotional, or redistributive use.
 
-## Story HTML parser
+## HTML parser
 
-The Node story scanner and builder include parse5 7.3.0 (MIT) and entities
-6.0.1 (BSD-2-Clause), bundled into `story/vendor/html-parser.mjs`. The parser is
-not embedded in generated HTML. Pinned sources, rebuild instructions and the
-complete licenses are in `story/vendor/`.
+The Node SVG baker includes parse5 7.3.0 (MIT) and entities 6.0.1
+(BSD-2-Clause), bundled into `renderers/shared/vendor/html-parser.mjs`. The
+parser is not embedded in generated HTML. Pinned sources, rebuild instructions
+and the complete licenses are in `renderers/shared/vendor/`.
 
 ## Code Analysis external diagnostics
 

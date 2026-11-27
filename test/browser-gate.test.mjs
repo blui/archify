@@ -171,14 +171,14 @@ test('changed browser profile runs only maintained suites and rejects invalid se
   const run = (selection, args = []) => spawnSync(process.execPath, [runner, ...args], {
     encoding: 'utf8', env: {
       ...process.env, ARCHIFY_CHROME: '', CI_BROWSER_PROFILE: 'changed',
-      CI_BROWSER_TESTS: selection, CI_STORY_BROWSER_OWNER: 'webm',
+      CI_BROWSER_TESTS: selection,
     },
   });
   const listed = run(JSON.stringify(files), ['--list', '--shard=1/1']);
   assert.equal(listed.status, 0, listed.stderr);
   assert.deepEqual(listed.stdout.trim().split('\n'), files.map(file => path.normalize(file)));
   assert.match(run(JSON.stringify(files), ['--shard=1/1']).stderr, /require an executable Chrome\/Chromium/);
-  const larger = [...files, 'test/story-choreography-browser.test.mjs'];
+  const larger = [...files, 'test/packaged-examples-browser.test.mjs'];
   const acrossShards = [1, 2, 3, 4].flatMap(index => {
     const result = run(JSON.stringify(larger), ['--list', `--shard=${index}/4`]);
     assert.equal(result.status, 0, result.stderr);

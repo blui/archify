@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { softwareNotices } from './software-notices.mjs';
-import { parse } from '../../story/vendor/html-parser.mjs';
+import { parse } from './vendor/html-parser.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const templatePath = path.join(skillRoot, 'assets', 'template.html');
@@ -639,7 +639,7 @@ export function assertCamoSafeSvg(svgString, { maxBytes = CAMO_MAX_BYTES, assert
   const problems = [];
   const bytes = Buffer.byteLength(svgString, 'utf8');
   if (!/^(<\?xml[^>]*\?>\s*)?<svg\b/.test(svgString.trimStart())) {
-    problems.push({ code: 'svg/not-svg', message: 'does not start with an <svg> root', fix: 'export through archify export-svg or archify story svg' });
+    problems.push({ code: 'svg/not-svg', message: 'does not start with an <svg> root', fix: 'export through archify export-svg' });
   }
   if (!/\sxmlns="http:\/\/www\.w3\.org\/2000\/svg"/.test(svgString.slice(0, 4000))) {
     problems.push({ code: 'svg/missing-xmlns', message: 'root lacks the SVG namespace, so <img> cannot render it', fix: 'declare xmlns="http://www.w3.org/2000/svg" on the root' });

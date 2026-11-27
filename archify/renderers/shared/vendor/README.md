@@ -1,7 +1,7 @@
-# Story HTML parser
+# HTML parser
 
 `html-parser.mjs` bundles the `parse` and `serializeOuter` exports of parse5
-7.3.0 with entities 6.0.1. It is used only by the Node story scanner and builder,
+7.3.0 with entities 6.0.1. It is used only by the Node SVG baker,
 and is not embedded in generated HTML. Packaged commands need no npm install.
 
 Sources: [parse5](https://github.com/inikulin/parse5/tree/v7.3.0),
@@ -16,5 +16,5 @@ export { parse, serializeOuter } from 'parse5';
 ```
 
 ```sh
-npx --yes esbuild@0.25.11 --bundle --platform=node --format=esm --target=node18 --minify --legal-comments=none --outfile=archify/story/vendor/html-parser.mjs < entry.mjs
+npx --yes esbuild@0.25.11 --bundle --platform=node --format=esm --target=node18 --minify --legal-comments=none --outfile=archify/renderers/shared/vendor/html-parser.mjs < entry.mjs
 ```

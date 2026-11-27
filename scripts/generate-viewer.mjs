@@ -67,7 +67,6 @@ export function generateViewer({ root = defaultRoot, check = false } = {}) {
   }
   const artifacts = [
     [output, generated],
-    [path.join(root, 'archify/story/native-motion.js'), fs.readFileSync(path.join(root, 'viewer/motion-governor.js'), 'utf8')],
   ];
   for (const [target, content] of artifacts) {
     if (check) {

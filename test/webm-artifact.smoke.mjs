@@ -8,13 +8,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { findChrome } from '../archify/bin/visual-check.mjs';
-import { storyMediaBrowserTest } from '../scripts/browser-test-inventory.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillRoot = path.resolve(__dirname, '..', 'archify');
 const [profile = 'full', ...extra] = process.argv.slice(2);
-assert.ok(['full', 'viewer', 'story'].includes(profile) && !extra.length,
-  'Expected one WebM profile: full, viewer or story');
+assert.ok(['full', 'viewer'].includes(profile) && !extra.length,
+  'Expected one WebM profile: full or viewer');
 const externalReachSource = process.env.ARCHIFY_REACH_CARD_SOURCE
   ? path.resolve(process.env.ARCHIFY_REACH_CARD_SOURCE)
   : '';
@@ -51,24 +50,6 @@ const ffmpeg = executable([process.env.ARCHIFY_FFMPEG, 'ffmpeg']);
 
 assert.ok(chrome, 'Chrome/Chromium is required for the WebM artifact smoke test (or set ARCHIFY_CHROME)');
 assert.ok(ffmpeg, 'ffmpeg is required for the WebM artifact smoke test (or set ARCHIFY_FFMPEG)');
-
-function runStoryTests() {
-  const ffprobe = executable([process.env.ARCHIFY_FFPROBE, 'ffprobe']);
-  assert.ok(ffprobe, 'ffprobe is required for the Story audio gate (or set ARCHIFY_FFPROBE)');
-  // The browser suite normally allows skips. A requested media check requires Chrome.
-  assert.ok(findChrome({ env: { ...process.env, ARCHIFY_CHROME: chrome } }), 'Story media tests require an executable Chrome');
-  execFileSync(process.execPath, ['--test', path.join(__dirname, storyMediaBrowserTest)], {
-    env: { ...process.env, ARCHIFY_CHROME: chrome, ARCHIFY_FFMPEG: ffmpeg, ARCHIFY_FFPROBE: ffprobe },
-    stdio: 'inherit',
-    timeout: 60_000,
-  });
-}
-
-if (profile === 'story') {
-  assert.ok(!externalReachSource, 'External Reach Card capture requires the viewer or full profile');
-  runStoryTests();
-  process.exit(0);
-}
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-webm-artifact-'));
 
@@ -1730,7 +1711,6 @@ try {
   assert.ok(uniqueFrames.size >= 2, 'decoded WebM frames are static');
   console.log(`ok WebM artifact: ${payload.size} bytes, ${hashes.length} sampled frames, ${uniqueFrames.size} unique`);
   await verifyArchitectureDeltaNavigator(path.resolve(skillRoot, '../examples/checkout-platform-delta.html'));
-  if (profile === 'full') runStoryTests();
 } finally {
   if (cdp && targetId) await withTimeout(cdp.send('Target.closeTarget', { targetId }), 500, 'target close').catch(() => {});
   if (cdp) cdp.socket.close();
