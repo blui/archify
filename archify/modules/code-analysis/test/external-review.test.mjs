@@ -7,8 +7,9 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { acceptFinding, baselineFrom, comparability, isOpen, reviewFindings, reviewTargetDigest, revokeFinding, validateBaseline } from '../lib/review.mjs';
-import { createRangeDigest, verifyTask } from '../lib/evidence.mjs';
-import { splitLines, withExcerpt } from '../lib/task.mjs';
+import { createRangeDigest, verifyEvidence } from '../lib/evidence.mjs';
+import { hashLocation } from '../lib/finding-evidence.mjs';
+import { splitLines } from '../core/index.mjs';
 import { DiagnosticError } from '../core/index.mjs';
 
 const sha = (value) => value.repeat(64);
@@ -196,14 +197,14 @@ function capturedTask(t, binding = 'verified') {
   diagnostic.external.binding = binding;
   return { root, task: {
     findings: [diagnostic], source: { external: [source({ binding })] },
-    locations: [withExcerpt({ findingId: diagnostic.id, file: 'src/a.ts', startLine: 1, endLine: 1, kind: 'range' }, splitLines(text))],
+    locations: [hashLocation({ findingId: diagnostic.id, file: 'src/a.ts', startLine: 1, endLine: 1, kind: 'range' }, splitLines(text))],
   } };
 }
 
 test('task evidence keeps source-byte verification separate from report freshness', (t) => {
   for (const [binding, expected] of [['verified', 'valid'], ['unverified', 'unverifiable'], ['changed', 'changed']]) {
     const { root, task } = capturedTask(t, binding);
-    const result = verifyTask(task, root);
+    const result = verifyEvidence(task, root);
     assert.equal(result.locations[0].status, 'valid');
     assert.equal(result.evidence.status, expected);
     const checked = result.evidence.findings[task.findings[0].id];
@@ -217,9 +218,9 @@ test('task evidence keeps source-byte verification separate from report freshnes
 test('missing task source context cannot upgrade a report, and missing source stays the strongest failure', (t) => {
   const { root, task } = capturedTask(t);
   delete task.source.external;
-  assert.equal(verifyTask(task, root).evidence.status, 'unverifiable');
+  assert.equal(verifyEvidence(task, root).evidence.status, 'unverifiable');
   fs.rmSync(path.join(root, 'src/a.ts'));
-  const missing = verifyTask(task, root);
+  const missing = verifyEvidence(task, root);
   assert.equal(missing.evidence.status, 'missing');
   assert.equal(missing.evidence.findings[task.findings[0].id].sourceStatus, 'missing');
 });
@@ -230,9 +231,9 @@ test('generation-time source hashes catch a change elsewhere in the external sca
   const other = path.join(root, 'src/use.ts');
   fs.writeFileSync(other, use);
   task.source.external[0].sourceHashes = { 'src/use.ts': createHash('sha256').update(use).digest('hex') };
-  assert.equal(verifyTask(task, root).evidence.status, 'valid');
+  assert.equal(verifyEvidence(task, root).evidence.status, 'valid');
   fs.writeFileSync(other, 'export {};\n');
-  const result = verifyTask(task, root);
+  const result = verifyEvidence(task, root);
   assert.equal(result.locations[0].status, 'valid', 'the cited declaration is unchanged');
   assert.equal(result.evidence.findings[task.findings[0].id].sourceStatus, 'valid');
   assert.equal(result.evidence.status, 'changed', 'the external scan used another version of a relevant file');

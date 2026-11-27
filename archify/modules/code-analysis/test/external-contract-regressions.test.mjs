@@ -8,7 +8,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { importExternal } from '../lib/external.mjs';
 import { acceptFinding, reviewFindings } from '../lib/review.mjs';
-import { buildTask, validateTask } from '../lib/task.mjs';
+import { captureEvidence } from '../lib/finding-evidence.mjs';
 import { DiagnosticError } from '../core/index.mjs';
 
 const sourceText = 'const unused = 1;\n';
@@ -155,7 +155,7 @@ test('SARIF extension rule namespaces remain distinct and stable when extension 
   assert.notEqual(reviewFindings(remaining.diagnostics, { baseline: ambiguousBaseline }).findings[remaining.diagnostics[0].id].status, 'accepted');
 });
 
-test('SARIF related locations remain readable context without becoming a missing primary or an edit scope', (t) => {
+test('SARIF related locations remain context without becoming a missing primary', (t) => {
   const load = workspace(t);
   const report = sarif({
     locations: [{ logicalLocations: [{ fullyQualifiedName: 'compiled.Symbol' }] }],
@@ -170,21 +170,14 @@ test('SARIF related locations remain readable context without becoming a missing
   assert.deepEqual(finding.external.origin.nativeLocations[0].logicalLocations, [{ fullyQualifiedName: 'compiled.Symbol' }]);
   assert.throws(() => acceptFinding(finding, { reason: 'A source citation exists.' }), error => error.diagnostics?.[0]?.code === 'baseline/evidence-unverifiable');
   const repository = { root: '.', language: 'ts' };
-  const task = buildTask({ findings: { repository, diagnostics: imported.diagnostics, analysis: { external: imported.sources }, externalEvidence: imported.evidenceFiles }, facts: { repository, files: [] }, ids: [finding.id] });
-  validateTask(task);
-  assert.deepEqual(task.scope.modify, []);
-  assert.deepEqual(task.scope.read, ['src/a.js']);
+  const task = captureEvidence({ findings: { repository, diagnostics: imported.diagnostics, analysis: { external: imported.sources }, externalEvidence: imported.evidenceFiles }, facts: { repository, files: [] }, ids: [finding.id] });
   assert.equal(task.locations[0].role, 'related');
-  assert.ok(task.locations[0].excerpt.segments[0].lines.includes('const unused = 1;'));
-  assert.ok(task.toConfirm.some(item => /primary.*location/i.test(item)));
 
   // An available primary stays editable; a different related file stays context.
   report.runs[0].results[0].locations = [{ physicalLocation: { artifactLocation: { uri: 'src/a%20b.js' }, region: { startLine: 1 } } }];
   const mapped = load('sarif', report);
-  const mappedTask = buildTask({ findings: { repository, diagnostics: mapped.diagnostics, analysis: { external: mapped.sources }, externalEvidence: mapped.evidenceFiles }, facts: { repository, files: [] }, ids: [mapped.diagnostics[0].id] });
-  validateTask(mappedTask);
-  assert.deepEqual(mappedTask.scope.modify, ['src/a b.js']);
-  assert.deepEqual(mappedTask.scope.read, ['src/a.js']);
+  const mappedTask = captureEvidence({ findings: { repository, diagnostics: mapped.diagnostics, analysis: { external: mapped.sources }, externalEvidence: mapped.evidenceFiles }, facts: { repository, files: [] }, ids: [mapped.diagnostics[0].id] });
+  assert.deepEqual(mappedTask.locations.map((loc) => [loc.file, loc.role || 'primary']), [['src/a b.js', 'primary'], ['src/a.js', 'related']]);
 
   const result = report.runs[0].results[0];
   result.fingerprints = { 'result/v1': 'same-result' };

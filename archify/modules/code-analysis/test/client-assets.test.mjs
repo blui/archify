@@ -11,7 +11,7 @@ const names = fs.readdirSync(dir).sort();
 
 test('client assets: analysis and drift pages inline their respective browser code', () => {
   const drift = ['drift.css', 'drift.js'];
-  const analysis = ['atlas.css', 'atlas.js', 'atlas3d.css', 'atlas3d.js', 'entry.css', 'overlay.css', 'overlay.js', 'verification.js'];
+  const analysis = ['atlas.css', 'atlas.js', 'atlas3d.css', 'atlas3d.js', 'entry.css', 'overlay.css', 'overlay.js'];
   assert.deepEqual(names, [...analysis, ...drift].sort());
   const { html } = buildOverlay({ graph: { modules: [], edges: [], repository: { language: 'ts' }, excluded: {}, unresolved: {} } });
   const driftHtml = renderDriftOverlay(
@@ -20,7 +20,7 @@ test('client assets: analysis and drift pages inline their respective browser co
     'a'.repeat(64),
   );
   for (const name of names) assert.equal(clientAsset(name), '\n' + fs.readFileSync(new URL(name, dir), 'utf8'));
-  assert.ok(html.includes(clientAsset('verification.js')), 'the offline report carries its receipt client');
+  assert.ok(html.includes(clientAsset('overlay.js')), 'the offline report carries its workbench client');
   for (const name of drift) {
     assert.ok(driftHtml.includes(clientAsset(name)), name);
     assert.ok(!html.includes(clientAsset(name)), 'ordinary analysis has no drift assets: ' + name);

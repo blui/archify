@@ -43,7 +43,7 @@ test('comparison options reject unpaired commits, GitHub flags and unsafe scopes
   for(const scope of ['../outside','/absolute','src/../outside','src\\file','.git/objects'])assert.throws(()=>normalizeScope(scope));
 });
 
-test('pinned comparison preparation uses native findings, localization, source markers and tasks',async t=>{
+test('pinned comparison preparation uses native findings, localization, source markers and finding locations',async t=>{
   const f=fixture(t),out=path.join(f.dir,'out'),dirtyBefore=git(f.root,['status','--porcelain']);
   const result=await prepareAnalysisView([f.root,'--out',out,...f.args],f.dependencies);
   const data=payload(fs.readFileSync(result.html,'utf8'));
@@ -56,23 +56,20 @@ test('pinned comparison preparation uses native findings, localization, source m
   assert.match(data.pullRequest.beforeSources['b.ts'].lines.join('\n'),/import/);
   assert.ok(data.pullRequest.changes.some(c=>c.path==='removed.ts'&&c.status==='removed'));
   assert.ok(result.resume.command.includes('--base '+f.base)&&result.resume.command.includes('--head '+f.head));
-  assert.ok(Object.keys(data.tasks).length>0);
-  for(const item of Object.values(data.tasks))assert.equal(item.task.source.gitHead,f.head);
+  assert.ok(Object.keys(data.findingLocations).length>0);
   assert.equal(git(f.root,['status','--porcelain']),dirtyBefore);
   assert.equal(git(f.root,['rev-parse','HEAD']),f.head);
 });
 
-test('live pinned analysis verifies tasks against captured head, retains merge-base on review and preserves good results after failure',async t=>{
+test('live pinned analysis checks evidence against captured head, retains merge-base on review and preserves good results after failure',async t=>{
   const f=fixture(t),view=await startAnalysisView([f.root,'--out',path.join(f.dir,'out'),...f.args],f.dependencies);
   t.after(()=>{view.server.closeAllConnections();view.server.close();});
   const post=(route,input,refresh=false)=>fetch(view.url+route,{method:'POST',headers:{Origin:view.url,'X-Analysis-Token':view.token,'Content-Type':'application/json',...(refresh?{'X-Analysis-Refresh':'1'}:{})},...(input?{body:JSON.stringify(input)}:{})});
   assert.equal((await fetch(view.url+'/analyze',{method:'POST'})).status,403);
   const analyzed=await post('/analyze');assert.equal(analyzed.status,200,await analyzed.clone().text());
   const html=await analyzed.text(),data=payload(html),finding=data.findings[0];assert.ok(finding);
-  // Mutable local edits must neither replace PR evidence nor invalidate pinned tasks.
+  // Mutable local edits must neither replace pinned evidence nor block accepting a finding.
   fs.writeFileSync(path.join(f.root,'a.ts'),'not the PR head anymore\n');
-  const task=await post('/task',{ids:[finding.id],expected:{[finding.id]:finding.reviewTarget}});
-  assert.equal(task.status,200,await task.clone().text());assert.equal((await task.json()).task.evidence.status,'valid');
   const review=await post('/review',{action:'accept',id:finding.id,expected:finding.reviewTarget,reason:'existing PR scope'});
   assert.equal(review.status,200,await review.clone().text());const saved=await review.json();
   assert.equal(payload(saved.html).pullRequest.baseSHA,f.base);assert.equal(payload(saved.html).overview.review.comparison.comparable,true);

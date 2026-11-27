@@ -6,7 +6,6 @@ import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { extractFacts, loadConfig, mergeConfig, buildGraph, evaluateGraph } from '../lib/analysis.mjs';
 import { readEntry } from './entry-reader.mjs';
-import { buildTask } from '../lib/task.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
 function fixture(t,files,edition='2021'){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'archify-rust-calls-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
@@ -500,7 +499,6 @@ test('Rust structural source cycles do not claim runtime partial initialization 
  const cycles=findings.diagnostics.filter(d=>d.code==='coupling/import-cycle');assert.ok(cycles.length);
  assert.ok(cycles.every(d=>d.severity==='info'&&d.evidence.kind==='structural'&&d.evidence.risk.loading==='not-assessed'));
  assert.ok(cycles.every(d=>!d.message.includes('accesses to partially initialized')));
- const task=buildTask({findings,facts,ids:[cycles[0].id]});assert.equal(task.title,'Review the Rust structural dependency cycle');assert.ok(task.impact[0].statement.includes('compile-time'));assert.ok(task.acceptance.some(text=>text.includes('intentionally retained')));
 });
 
 // Compiler control: Cargo exposes [lib].name, not the package spelling.

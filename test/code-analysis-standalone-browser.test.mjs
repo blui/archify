@@ -10,7 +10,7 @@ import { ChromeVisualBrowser, findChrome } from '../archify/bin/visual-check.mjs
 const chrome=process.env.ARCHIFY_CHROME?findChrome():null;
 const cli=fileURLToPath(new URL('../archify/bin/archify.mjs',import.meta.url));
 
-test('standalone workbench keeps Atlas alongside evidence, both locales/themes and narrow task access',{skip:chrome?false:'Set ARCHIFY_CHROME for standalone browser acceptance.'},async t=>{
+test('standalone workbench keeps Atlas alongside evidence, both locales/themes and narrow finding access',{skip:chrome?false:'Set ARCHIFY_CHROME for standalone browser acceptance.'},async t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'archify-standalone-browser-'));
   let browser;
   t.after(async () => {
@@ -59,7 +59,6 @@ test('standalone workbench keeps Atlas alongside evidence, both locales/themes a
     .some(animation => animation.transitionProperty === 'grid-template-columns')`;
   const details = '#bauify-detail';
   const priority = '.priority-card [data-finding]';
-  const copy = '.priority-card .quick-copy';
   const list = '.atlas-side .module-list';
   const selectedModule = "document.documentElement.getAttribute('data-bauify-atlas-focus')";
   const selectedFinding = "document.documentElement.getAttribute('data-bauify-atlas-finding')";
@@ -105,31 +104,18 @@ test('standalone workbench keeps Atlas alongside evidence, both locales/themes a
       const state = await run(`(() => {
         const reader = document.getElementById('bauify-reader'), card = document.querySelector('.priority-card');
         const r = reader.getBoundingClientRect(), a = document.getElementById('bauify-atlas').getBoundingClientRect();
-        const c = card.querySelector('.quick-copy').getBoundingClientRect(), l = card.querySelector('.priority-level').getBoundingClientRect();
-        const icon = card.querySelector('.quick-copy svg').getBoundingClientRect(), label = card.querySelector('.bauify-item b').getBoundingClientRect();
+        const l = card.querySelector('.priority-level').getBoundingClientRect(), label = card.querySelector('.bauify-item b').getBoundingClientRect();
         return { lang: reader.lang, separate: innerWidth > 1000 ? a.right <= r.left : a.top >= r.bottom,
-          copy: [c.width, c.height], tag: [l.width, l.height], aligned: c.top === l.top && l.right < c.left && label.right <= l.left,
-          centered: c.left + c.width / 2 === icon.left + icon.width / 2 && c.top + c.height / 2 === icon.top + icon.height / 2,
-          visible: c.top >= Math.max(0, r.top) && c.bottom <= Math.min(innerHeight, r.bottom) && c.right <= r.right,
+          tag: [l.width, l.height], aligned: label.right <= l.left,
+          visible: l.top >= Math.max(0, r.top) && l.bottom <= Math.min(innerHeight, r.bottom) && l.right <= r.right,
           overflow: document.documentElement.scrollWidth > innerWidth, emptySwitch: !!document.querySelector('.atlas-classic,.reader-atlas'),
           noise: /not on this diagram|未映射到架构图/.test(document.getElementById('bauify-overview').innerText),
           extraDetails: !!card.querySelector('.what,.where,.priority-evidence,.priority-source') };
       })()`);
-      assert.deepEqual(state, { lang: locale, separate: true, copy: [24, 24], tag: [24, 24], aligned: true, centered: true, visible: true, overflow: false, emptySwitch: false, noise: false, extraDetails: false }, `${locale} ${theme} ${width}`);
+      assert.deepEqual(state, { lang: locale, separate: true, tag: [24, 24], aligned: true, visible: true, overflow: false, emptySwitch: false, noise: false, extraDetails: false }, `${locale} ${theme} ${width}`);
     }
     await viewport(1440, 900);
     await wait(canvasSized, 'Atlas did not return to its desktop size');
-    await run("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.__copied=text}})");
-    await click(copy);
-    await wait('window.__copied', 'the first-screen icon did not copy');
-    assert.equal(await run("window.__copied===(()=>{const d=JSON.parse(document.getElementById('bauify-analysis').textContent);return d.tasks[d.overview.priorities[0]].markdown})()"), true);
-    assert.equal(await run("document.getElementById('bauify-detail').hidden"), true, 'copy never opens the finding');
-    await run("navigator.clipboard.writeText = async () => { throw Error('denied'); }");
-    await click(copy);
-    await wait("document.querySelector('.priority-card .ai-task').open && document.activeElement.matches('.task-preview')", 'clipboard refusal did not open the manual copy fallback');
-    assert.equal(await run("document.activeElement.selectionStart === 0 && document.activeElement.selectionEnd === window.__copied.length"), true);
-    await run("document.querySelector('.priority-card .ai-task').open = false; document.getElementById('bauify-overview').scrollTop = 0");
-
     const id = await run("document.querySelector('.priority-card [data-finding]').dataset.finding");
     await click(priority);
     assert.equal(await run(selectedFinding), id);

@@ -7,8 +7,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { createRangeDigest, checkLocation, digestMatches, verifyTask } from '../lib/evidence.mjs';
-import { buildTask, rangeDigest, renderTaskMarkdown, splitLines, withExcerpt } from '../lib/task.mjs';
+import { createRangeDigest, checkLocation, digestMatches, verifyEvidence } from '../lib/evidence.mjs';
+import { captureEvidence, hashLocation } from '../lib/finding-evidence.mjs';
+import { rangeDigest, splitLines } from '../core/index.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
 
 const ID = 'REDU-0123456789ab';
@@ -37,7 +38,7 @@ function captured(files, locations, { kind = 'exact', identifiers = 'exact' } = 
     evidenceDigest: createRangeDigest(locations, sourceMap),
   };
   const findings = { schema_version: 1, repository, rules: ['redundancy/duplicate-block'], summary: { errors: 0, warnings: 1, info: 0, suppressed: 0 }, diagnostics: [diagnostic] };
-  return { findings, facts, diagnostic, task: buildTask({ findings, facts, ids: [ID] }) };
+  return { findings, facts, diagnostic, task: captureEvidence({ findings, facts, ids: [ID] }) };
 }
 
 function tree(t, files) {
@@ -50,48 +51,37 @@ function tree(t, files) {
 const pairFiles = () => ({ 'a.js': `// left\n${BLOCK}\n// left context\n`, 'b.js': `// right\n// note\n${BLOCK}\n// right context\n` });
 const pairLocations = () => [span('a.js', 2, 3), span('b.js', 3, 4)];
 
-test('duplicate tasks carry both ranges, detector facts and conservative acceptance', () => {
+test('duplicate evidence carries both cited ranges', () => {
   const { findings, diagnostic, task } = captured(pairFiles(), pairLocations());
   assert.deepEqual(schemaErrors('findings', findings), []);
-  assert.deepEqual(schemaErrors('ai-task', task), []);
   assert.deepEqual(task.locations.map((l) => [l.file, l.startLine, l.endLine, l.kind]), [['a.js', 2, 3, 'range'], ['b.js', 3, 4, 'range']]);
-  assert.deepEqual(task.scope.modify, ['a.js', 'b.js']);
-  assert.deepEqual(task.facts[0].evidence, diagnostic.evidence);
-  assert.match(task.impact[0].statement, /does not establish semantic equivalence/);
-  assert.ok(task.acceptance.some((s) => /retain separate implementations/.test(s)));
-  assert.match(renderTaskMarkdown(task), /a\.js:2-3/);
-  assert.match(renderTaskMarkdown(task), /b\.js:3-4/);
-  const invalid = structuredClone(task);
-  invalid.findings[0].evidenceDigest.ranges[0].capturedOccurrences = 0;
-  assert.ok(schemaErrors('ai-task', invalid).length, 'persisted range metadata is validated when a task is read');
 });
 
 test('duplicate evidence survives independent moves and unrelated edits on both sides', (t) => {
   const files = pairFiles(), locations = pairLocations();
   const { task, diagnostic } = captured(files, locations);
   const root = tree(t, files);
-  assert.equal(verifyTask(task, root).evidence.status, 'valid');
+  assert.equal(verifyEvidence(task, root).evidence.status, 'valid');
   const movedFiles = { 'a.js': `// first added comment\n${files['a.js']}const unrelated = 1;\n`, 'b.js': `// first\n// second\n${files['b.js'].replace('right context', 'new context')}` };
   for (const [file, text] of Object.entries(movedFiles)) fs.writeFileSync(path.join(root, file), text);
-  const checked = verifyTask(task, root);
+  const checked = verifyEvidence(task, root);
   assert.equal(checked.evidence.status, 'valid');
   assert.deepEqual(checked.locations.map((l) => [l.currentStartLine, l.currentEndLine]), [[3, 4], [5, 6]]);
   assert.equal(checked.evidence.findings[ID].digestMatches, true);
   const again = captured(movedFiles, [span('a.js', 3, 4), span('b.js', 5, 6)]);
   assert.equal(again.diagnostic.evidenceDigest.sha256, diagnostic.evidenceDigest.sha256);
-  assert.equal(again.task.taskId, task.taskId, 'line positions and unrelated code do not change the task identity');
 });
 
 test('each duplicate side can invalidate or become missing independently', (t) => {
   for (const file of ['a.js', 'b.js']) {
     const files = pairFiles(), { task } = captured(files, pairLocations()), root = tree(t, files);
     fs.writeFileSync(path.join(root, file), files[file].replace('consume(value)', 'consume(other)'));
-    const changed = verifyTask(task, root);
+    const changed = verifyEvidence(task, root);
     assert.equal(changed.evidence.status, 'changed', file);
     assert.equal(changed.evidence.findings[ID].digestMatches, false);
     assert.equal(changed.locations.find((l) => l.file !== file).status, 'valid');
     fs.rmSync(path.join(root, file));
-    assert.equal(verifyTask(task, root).evidence.status, 'missing', file);
+    assert.equal(verifyEvidence(task, root).evidence.status, 'missing', file);
   }
 });
 
@@ -102,10 +92,9 @@ test('same-file renamed ranges remain separate and can move by different amounts
   assert.deepEqual(diagnostic.evidenceDigest.files, ['both.js']);
   assert.equal(diagnostic.evidenceDigest.ranges.length, 2);
   assert.equal(task.locations.length, 2);
-  assert.deepEqual(task.scope.modify, ['both.js']);
   const root = tree(t, files);
   fs.writeFileSync(path.join(root, 'both.js'), `// above\n${BLOCK}\n// between\n// extra one\n// extra two\n${other}\n`);
-  const checked = verifyTask(task, root);
+  const checked = verifyEvidence(task, root);
   assert.equal(checked.evidence.status, 'valid');
   assert.deepEqual(checked.locations.map((l) => l.currentStartLine), [2, 7]);
 });
@@ -119,7 +108,7 @@ test('deleting a twin invalidates evidence even when both original positions sti
   const afterDeletion = `${BLOCK}\n${BLOCK}\n`;
   fs.writeFileSync(path.join(root, 'twins.js'), afterDeletion);
   assert.ok(task.locations.every((loc) => checkLocation(loc, { status: 'ok', text: afterDeletion }).status === 'valid'), 'without the new multiplicity guard, the old-position fast path falsely accepts both twins');
-  const checked = verifyTask(task, root);
+  const checked = verifyEvidence(task, root);
   assert.equal(checked.evidence.status, 'changed');
   assert.ok(checked.locations.every((loc) => loc.status === 'changed'));
   assert.equal(checked.evidence.findings[ID].digestMatches, false);
@@ -132,9 +121,9 @@ test('a new twin or ambiguous movement cannot silently refresh a duplicate task'
   const { task } = captured(files, [span('twins.js', 1, 2), span('twins.js', 3, 4)]);
   const root = tree(t, files);
   fs.writeFileSync(path.join(root, 'twins.js'), `${files['twins.js']}${BLOCK}\n`);
-  assert.equal(verifyTask(task, root).evidence.status, 'changed', 'an additional identical range changes captured multiplicity');
+  assert.equal(verifyEvidence(task, root).evidence.status, 'changed', 'an additional identical range changes captured multiplicity');
   fs.writeFileSync(path.join(root, 'twins.js'), `// inserted\n${files['twins.js']}`);
-  const moved = verifyTask(task, root);
+  const moved = verifyEvidence(task, root);
   assert.equal(moved.evidence.status, 'changed', 'two identical ranges cannot be identified independently after a move');
   assert.match(moved.locations[0].reason, /cannot be told apart/);
 });
@@ -165,7 +154,7 @@ test('JSON source strings retain UTF-8 evidence semantics when written to disk',
   assert.deepEqual(diagnostic.evidenceDigest.ranges.map((r) => r.capturedOccurrences), [3, 3]);
   assert.ok(diagnostic.evidenceDigest.ranges.every((r) => r.sha256 === hash('x\uFFFD')));
   const root = tree(t, files);
-  const checked = verifyTask(task, root);
+  const checked = verifyEvidence(task, root);
   assert.equal(checked.evidence.status, 'valid');
   assert.equal(checked.evidence.findings[ID].digestMatches, true);
 });
@@ -176,10 +165,8 @@ test('range capture refuses partial evidence and long excerpts still hash the en
   assert.equal(createRangeDigest([span('a.js', 1, 3)], source), null);
   assert.equal(createRangeDigest([span('a.js', 2, 1)], source), null);
   const lines = Array.from({ length: 140 }, (_, i) => `consume(${i});`);
-  const location = withExcerpt({ findingId: ID, file: 'long.js', kind: 'range', startLine: 1, endLine: 140 }, lines);
+  const location = hashLocation({ findingId: ID, file: 'long.js', kind: 'range', startLine: 1, endLine: 140 }, lines);
   assert.equal(location.sha256, hash(lines.join('\n')));
-  assert.equal(location.excerpt.complete, false);
-  assert.ok(location.excerpt.segments.reduce((n, s) => n + s.lines.length, 0) < 60);
   const changed = [...lines];
   changed[70] = 'consume("changed outside excerpt");';
   assert.equal(checkLocation(location, { status: 'ok', text: changed.join('\n') }, { strictOccurrences: true }).status, 'changed');

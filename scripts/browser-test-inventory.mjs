@@ -54,12 +54,11 @@ export const browserTestFiles = [
   'code-analysis-drift-browser.test.mjs',
   'code-analysis-complexity-browser.test.mjs',
   'code-analysis-review-browser.test.mjs',
-  'code-analysis-task-browser.test.mjs',
   'code-analysis-workbench-browser.test.mjs',
   'code-analysis-standalone-browser.test.mjs',
   'code-analysis-pr-browser.test.mjs',
-  'export-svg-delivery.test.mjs',
   'packaged-examples-browser.test.mjs',
+  'export-svg-delivery.test.mjs',
   // Benchmark observers and real export integration require this explicit Chrome lane.
   'node-index-route-browser.test.mjs',
 ];

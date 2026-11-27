@@ -1,5 +1,5 @@
 // PR-specific presentation data, derived from the two native analysis runs.
-// Rules, source excerpts, review decisions and AI tasks retain their existing owners.
+// Rules, source excerpts and review decisions retain their existing owners.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';

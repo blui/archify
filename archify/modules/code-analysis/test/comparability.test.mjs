@@ -11,7 +11,7 @@ import { loadConfig, mergeConfig } from '../lib/analysis.mjs';
 import { comparability, reviewFindings } from '../lib/review.mjs';
 import { DiagnosticError } from '../extract/shared/diagnostics.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
-import { analyzeFixture, copySource } from './task-fixtures.mjs';
+import { analyzeFixture, copySource } from './py-fixture.mjs';
 import { buildGraph, evaluateGraph, extractFacts } from '../lib/analysis.mjs';
 
 const CONFIG = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'py-tasks', 'analysis.config.json');

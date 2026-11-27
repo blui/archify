@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DiagnosticError, fail, receipt } from '../core/index.mjs';
-import { baselineCommand, taskCommand } from '../lib/task-command.mjs';
+import { baselineCommand } from '../lib/task-command.mjs';
 
 export const USAGE = `Usage:
   archify code-analysis check <repo-root> [--language ts|py|java|go|rust|c|cpp] [--config file.json]
@@ -181,16 +181,12 @@ export async function runCheck(argv) {
       // id, including accepted ones; the receipt needs only open sizes, so they
       // agree with `counts` and a dominant rule is visible before choosing a lead.
       ruleCounts: openRuleCounts(overview.findings),
-      // The same three leads as `priorities`, with message, location and a
-      // ready-to-run task command attached. The data already exists in the
-      // overview and the diagnostics; this only saves a manual join.
+      // The same three leads as `priorities`, with message and location. The
+      // data already exists in the overview and the diagnostics; this only
+      // saves a manual join.
       investigation: {
-        shell: process.platform === 'win32' ? 'cmd.exe' : 'POSIX sh',
-        leads: overview.investigation.leads.map((lead) => ({ ...lead, task: taskCommand(CLI, lead.id, root, out) })),
-        architecture: { ...overview.investigation.architecture, structuralSignals: overview.investigation.architecture.structuralSignals.map(signal => ({ ...signal, task: taskCommand(CLI, signal.id, root, out) })) },
-        drillDown: out
-          ? taskCommand(CLI, '<id>', root, out)
-          : 'Re-run with --out <dir> to drill down with the task command.',
+        leads: overview.investigation.leads,
+        architecture: overview.investigation.architecture,
       },
       // Already computed for the overview. Repeated here so a reader of the CLI
       // output sees a file that failed to parse, files excluded by role from the
@@ -304,11 +300,6 @@ export function formatText(r) {
       for (const sig of r.investigation.architecture.structuralSignals) {
         lines.push(`    - ${sig.severity.padEnd(7)} ${sig.code}  ${sig.where ?? sig.id}  [${sig.id}]`);
       }
-    }
-    if (r.investigation.drillDown) {
-      const label = `  Drill down (${r.investigation.shell}):`;
-      if (r.out) lines.push(label, formatTerminalCommand(r.investigation.drillDown, 'investigation.drillDown'));
-      else lines.push(`${label} ${r.investigation.drillDown}`);
     }
   }
   if (r.review.comparison) {

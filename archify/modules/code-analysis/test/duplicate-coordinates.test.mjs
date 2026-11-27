@@ -6,8 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { buildGraph, evaluateGraph, extractFacts, loadConfig } from '../lib/analysis.mjs';
-import { buildTask } from '../lib/task.mjs';
-import { verifyTask } from '../lib/evidence.mjs';
+import { verifyEvidence } from '../lib/evidence.mjs';
+import { captureEvidence } from '../lib/finding-evidence.mjs';
 
 const BINARY = process.env.ARCHIFY_TEST_JSCPD;
 const REAL = { skip: !BINARY && 'set ARCHIFY_TEST_JSCPD to a real jscpd 5.4.3 executable' };
@@ -116,7 +116,7 @@ test('duplicates: native Unicode and CRLF ranges become precise UTF-16 finding l
   }
 });
 
-test('duplicates: real same-file occurrences both reach a task and a changed copy invalidates it', REAL, t => {
+test('duplicates: real same-file occurrences both reach the evidence and a changed copy invalidates it', REAL, t => {
   const source = LEFT + '\nconst splitter = "不同隔断🐈";\n' + ALPHA.replace('NAME', 'sumAgain');
   const root = tree(t, { 'two.js': source });
   const { facts, findings, duplicates } = scan(root);
@@ -127,13 +127,13 @@ test('duplicates: real same-file occurrences both reach a task and a changed cop
   assert.equal(locations.length, 2);
   assert(locations[0].end <= locations[1].start, 'same-file sides are distinct, non-overlapping occurrences');
   for (const location of locations) assert.match(source.slice(location.start, location.end), /return résultat \+ accepted \+ label\.length/);
-  const task = buildTask({ findings, facts, ids: [finding.id] });
+  const task = captureEvidence({ findings, facts, ids: [finding.id] });
   assert.equal(task.locations.length, 2);
-  assert.equal(verifyTask(task, root).evidence.status, 'valid');
+  assert.equal(verifyEvidence(task, root).evidence.status, 'valid');
   const secondFunction = source.indexOf('function sumAgain');
   const changed = source.slice(0, secondFunction) + source.slice(secondFunction).replace('résultat += value;', 'résultat += value * 2;');
   fs.writeFileSync(path.join(root, 'two.js'), changed);
-  const verified = verifyTask(task, root);
+  const verified = verifyEvidence(task, root);
   assert.equal(verified.evidence.status, 'changed');
   assert.equal(verified.evidence.findings[finding.id].digestMatches, false);
   assert.equal(verified.locations.filter(location => location.status === 'valid').length, 1, 'the untouched side remains independently valid');
@@ -150,14 +150,13 @@ test('duplicates: independent blocks in one file pair keep distinct IDs through 
   const ids = before.duplicates.map(finding => finding.id).sort();
   assert.equal(new Set(ids).size, 2, 'pair paths alone cannot identify independent blocks');
   for (const finding of before.duplicates) assert.deepEqual([...finding.subject.files].sort(), ['left.js', 'right.js']);
-  const task = buildTask({ findings: before.findings, facts: before.facts, ids });
+  const task = captureEvidence({ findings: before.findings, facts: before.facts, ids });
   fs.writeFileSync(path.join(root, 'left.js'), '// 新注释😀\n\n' + files['left.js']);
   fs.writeFileSync(path.join(root, 'right.js'), '// independent context\n\n\n' + files['right.js']);
   fs.writeFileSync(path.join(root, '000-unrelated.js'), INDEPENDENT);
   const after = scan(root);
   assert.deepEqual(after.duplicates.map(finding => finding.id).sort(), ids);
-  assert.equal(verifyTask(task, root).evidence.status, 'valid', 'leading context may move both pieces without changing their evidence');
-  assert.equal(buildTask({ findings: after.findings, facts: after.facts, ids }).taskId, task.taskId);
+  assert.equal(verifyEvidence(task, root).evidence.status, 'valid', 'leading context may move both pieces without changing their evidence');
 });
 
 test('duplicates: identical content across three files does not collapse distinct native pairs', REAL, t => {

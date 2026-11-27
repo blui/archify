@@ -27,7 +27,7 @@ test('prepare without IR is portable; explicit locale overrides an untouched aut
   const a=payload(fs.readFileSync(standalone.html,'utf8'));
   assert.equal(a.ui.mode,'standalone');assert.equal(a.ui.locale,'zh-CN');
   assert.equal(a.overview.counts.offDiagram,null);assert.deepEqual(a.overview.coverage.unmappedModules,[]);
-  assert.ok(a.overview.priorities.length>0);assert.ok(Object.keys(a.tasks).length>0);
+  assert.ok(a.overview.priorities.length>0);assert.ok(Object.keys(a.findingLocations).length>0);
   assert.doesNotMatch(standalone.resume.command,/--ir/);assert.match(standalone.resume.command,/--locale zh-CN/);
   const ir=path.join(dir,'input.json');
   const bytes=JSON.stringify({schema_version:1,diagram_type:'architecture',meta:{title:'Diagram',output:'architecture.html',locale:'en'},components:[{id:'app',type:'backend',label:'App',pos:[40,40],size:[170,64]}],connections:[]});
@@ -38,7 +38,7 @@ test('prepare without IR is portable; explicit locale overrides an untouched aut
   assert.equal(fs.readFileSync(ir,'utf8'),bytes);
   for(const file of ['raw-facts.json','module-graph.json','findings.json']) assert.equal(fs.readFileSync(path.join(dir,'standalone/analysis',file),'utf8'),fs.readFileSync(path.join(dir,'diagram/analysis',file),'utf8'),file);
 });
-test('standalone service keeps authorization, current-source tasks, review rendering and real re-analysis',async t=>{
+test('standalone service keeps authorization, review rendering and real re-analysis',async t=>{
   const {dir,root}=fixture(t);
   const view=await startAnalysisView([root,'--out',path.join(dir,'view'),'--locale','zh-CN']);
   t.after(()=>{view.server.closeAllConnections();view.server.close();});
@@ -49,8 +49,6 @@ test('standalone service keeps authorization, current-source tasks, review rende
   const post=(route,input,extra={})=>fetch(view.url+route,{method:'POST',headers:{...headers,...extra},...(input?{body:JSON.stringify(input)}:{})});
   const response=await post('/analyze');assert.equal(response.status,200);
   const data=payload(await response.text());const finding=data.findings[0];assert.ok(finding);
-  const task=await post('/task',{ids:[finding.id],expected:{[finding.id]:finding.reviewTarget}});
-  assert.equal(task.status,200);assert.equal((await task.json()).task.evidence.status,'valid');
   const review=await post('/review',{action:'accept',id:finding.id,expected:finding.reviewTarget,reason:'existing scope'});
   assert.equal(review.status,200,await review.text());
   assert.equal(payload(fs.readFileSync(path.join(view.out,'analysis/repo.analysis.html'),'utf8')).ui.mode,'standalone');

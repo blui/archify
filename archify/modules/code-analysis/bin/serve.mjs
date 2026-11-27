@@ -6,8 +6,6 @@
 //   3. Clicking it runs the analysis (extract → graphs → evaluate → overlay) for the
 //      repository and switches the page to the analysis view. Nothing runs before the click.
 //   4. "Re-analyze" on the overview runs it again after code changes, without a restart.
-//   5. POST /task builds an AI optimization task for selected findings of the current
-//      result and checks its evidence against the working tree (lib/task.mjs, lib/evidence.mjs).
 // Each run happens in a child process (bin/analyze-run.mjs) so the server stays
 // responsive, writes to a fresh directory, and replaces <out>/analysis only when it
 // succeeds; the run it replaces moves to <out>/analysis.previous and is the
@@ -32,7 +30,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const moduleRoot = path.resolve(here, '..');
 const archify = path.resolve(here, '../../../bin/archify.mjs');
 const worker = path.join(here, 'analyze-run.mjs');
-const TASK_BODY_LIMIT = 16 * 1024;
+const REQUEST_BODY_LIMIT = 16 * 1024;
 
 // Runs one analysis in a child process and resolves with its receipt.
 // Failures come back as the worker's structured diagnostics.
@@ -71,8 +69,6 @@ export const USAGE = `Usage:
 Without --ir, opens a standalone workbench with Atlas and analyzes on page load.
 With --ir, delivers the authored diagram and waits for a Code Analysis click.
 Re-analyze runs again after source changes; --locale overrides the IR locale.
-The page can request an AI optimization task for selected findings (POST /task),
-checked against the current working tree.
 Output: with --ir, <dir>/architecture.html (Archify's artifact, untouched); always
 <dir>/analysis/{raw-facts,module-graph,findings,review,overview}.json + repo.analysis.html;
 the run before is kept in <dir>/analysis.previous and compared with.`;
@@ -220,9 +216,8 @@ export async function startAnalysisView(argv, dependencies = {}) {
     const send = (status, body, type = 'application/json') => { res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(body); };
     if (req.headers.host !== new URL(origin).host) return send(403, '{}');
     if (req.method === 'GET' && new URL(req.url, origin).pathname === '/') return send(200, page, 'text/html; charset=utf-8');
-    if (req.method !== 'POST' || !['/analyze', '/task', '/review'].includes(req.url)) return send(404, '{}');
+    if (req.method !== 'POST' || !['/analyze', '/review'].includes(req.url)) return send(404, '{}');
     if (req.headers.origin !== origin || req.headers['x-analysis-token'] !== token) return send(403, '{}');
-    if (req.url === '/task') return handleTask(req, send);
     if (req.url === '/review') return handleReview(req, send);
     if (reviewing) return send(409, JSON.stringify({ error: 'A review decision is being saved; retry when it has finished.' }));
     // Check before cached results as well: this page belongs to the delivered IR.
@@ -242,44 +237,12 @@ export async function startAnalysisView(argv, dependencies = {}) {
       send(500, JSON.stringify({ error: diagnostics.map((d) => d.message).join('\n'), diagnostics }));
     }
   });
-  // 5. A task for findings of the result on disk, checked against the working tree now.
-  // Page requests bind the displayed claims; ids-only clients read the current
-  // result. Files and directories are fixed by the server in both cases.
-  const handleTask = async (req, send) => {
-    const fail409 = (code, message, fixes) => send(409, JSON.stringify({ error: message, diagnostics: [{ code, severity: 'error', message, subject: {}, evidence: {}, supportedFixes: fixes }] }));
-    let body = '';
-    req.setEncoding('utf8');
-    try {
-      for await (const chunk of req) { body += chunk; if (Buffer.byteLength(body) > TASK_BODY_LIMIT) return send(413, JSON.stringify({ error: 'request too large' })); }
-    } catch { return send(400, JSON.stringify({ error: 'request could not be read' })); }
-    let ids, expected;
-    try { ({ ids, expected } = JSON.parse(body || '{}')); } catch { return send(400, JSON.stringify({ error: 'request body must be JSON: {"ids": [...]}' })); }
-    if (!Array.isArray(ids) || !ids.length || ids.length > 20 || !ids.every((id) => typeof id === 'string' && /^[A-Z]{2,4}-(?:[0-9a-f]{12}|[0-9]{4,})$/.test(id))) return send(400, JSON.stringify({ error: 'ids must list 1–20 finding ids' }));
-    if (expected !== undefined && (!expected || typeof expected !== 'object' || Array.isArray(expected) || ids.some((id) => typeof expected[id] !== 'string' || !/^[0-9a-f]{64}$/.test(expected[id])))) return send(400, JSON.stringify({ error: 'expected must map every selected finding id to its displayed reviewTarget digest' }));
-    if (pending || reviewing) return fail409('task/analysis-running', 'An analysis or review update is running; build the task when it has finished.', ['retry after the analysis completes']);
-    if (!fs.existsSync(path.join(analysisDir, 'findings.json'))) return fail409('task/no-analysis', 'Run the analysis before building a task.', ['click Code Analysis first']);
-    try {
-      const { buildTask, renderTaskMarkdown } = await import('../lib/task.mjs');
-      const { verifyTask } = await import('../lib/evidence.mjs');
-      const { loadBaseline, loadPrevious } = await import('../lib/analysis.mjs');
-      const { reviewFindings, reviewTargetDigest } = await import('../lib/review.mjs');
-      const read = (name) => JSON.parse(fs.readFileSync(path.join(analysisDir, name), 'utf8'));
-      const findings = read('findings.json'), facts = read('raw-facts.json');
-      if (expected && findings.diagnostics.some((finding) => ids.includes(finding.id) && reviewTargetDigest(finding) !== expected[finding.id])) return fail409('task/finding-changed', 'The finding changed since this page was loaded. Re-analyze to refresh the displayed claim before exporting its task.', ['refresh the analysis page and review the current finding']);
-      const review = reviewFindings(findings.diagnostics, { baseline: fs.existsSync(baselineFile) ? loadBaseline(baselineFile) : null, previous: loadPrevious(comparisonFile()), analysis: findings.analysis, files: [...facts.files, ...(findings.externalEvidence || [])].map((f) => f.path) });
-      const task = verifyTask(buildTask({ findings, facts, ids, review }), currentRoot());
-      send(200, JSON.stringify({ task, markdown: renderTaskMarkdown(task) }));
-    } catch (error) {
-      const diagnostics = error instanceof DiagnosticError ? error.diagnostics : [{ code: 'internal/unclassified', severity: 'error', message: error.message, subject: {}, evidence: {}, supportedFixes: [] }];
-      send(error instanceof DiagnosticError ? 422 : 500, JSON.stringify({ error: diagnostics.map((d) => d.message).join('\n'), diagnostics }));
-    }
-  };
   // A fixed baseline destination and one id per decision. Paths are never supplied
   // by the request, and an acceptance is bound to evidence checked now.
   const handleReview = async (req, send) => {
     let body = '';
     req.setEncoding('utf8');
-    try { for await (const chunk of req) { body += chunk; if (Buffer.byteLength(body) > TASK_BODY_LIMIT) return send(413, JSON.stringify({ error: 'request too large' })); } }
+    try { for await (const chunk of req) { body += chunk; if (Buffer.byteLength(body) > REQUEST_BODY_LIMIT) return send(413, JSON.stringify({ error: 'request too large' })); } }
     catch { return send(400, JSON.stringify({ error: 'request could not be read' })); }
     let input;
     try { input = JSON.parse(body); } catch { return send(400, JSON.stringify({ error: 'request body must be JSON' })); }
@@ -292,8 +255,7 @@ export async function startAnalysisView(argv, dependencies = {}) {
     try {
       const { loadBaseline, saveBaseline, loadPrevious } = await import('../lib/analysis.mjs');
       const { acceptFinding, revokeFinding, reviewFindings, reviewTargetDigest } = await import('../lib/review.mjs');
-      const { buildTask } = await import('../lib/task.mjs');
-      const { verifyTask } = await import('../lib/evidence.mjs');
+      const { checkFindingEvidence } = await import('../lib/finding-evidence.mjs');
       const { renderAnalysisSnapshot, writeAnalysisView } = await import('../overlay/page.mjs');
       const findings = JSON.parse(fs.readFileSync(path.join(analysisDir, 'findings.json'), 'utf8'));
       const facts = JSON.parse(fs.readFileSync(path.join(analysisDir, 'raw-facts.json'), 'utf8'));
@@ -303,7 +265,7 @@ export async function startAnalysisView(argv, dependencies = {}) {
         const diagnostic = findings.diagnostics.find((d) => d.id === input.id);
         if (!diagnostic) return send(409, JSON.stringify({ error: 'This finding is not in the current analysis; refresh the result.' }));
         if (reviewTargetDigest(diagnostic) !== input.expected) return send(409, JSON.stringify({ error: 'The finding changed since this page was loaded. Refresh the result before accepting.' }));
-        const checked = verifyTask(buildTask({ findings, facts, ids: [input.id] }), currentRoot()).evidence.findings[input.id];
+        const checked = checkFindingEvidence({ findings, facts, ids: [input.id], root: currentRoot() }).evidence.findings[input.id];
         if ((checked.sourceStatus || checked.status) !== 'valid' || checked.reportBinding === 'changed') return send(409, JSON.stringify({ error: 'The captured evidence changed or cannot be checked. Re-analyze before accepting.', evidence: checked }));
         next = acceptFinding(diagnostic, { existing, reason: input.reason });
       } else next = revokeFinding(input.id, { existing });
@@ -386,18 +348,6 @@ function client(token, messages, makeTranslator, standalone, entryCss) {
   var toolbarObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(reposition) : null;
   if (toolbarObserver) toolbarObserver.observe(toolbar);
   var say = function (text) { note.textContent = text; note.style.display = text ? 'block' : 'none'; reposition(); };
-  window.__archifyBuildTask = async function (id, expected) {
-    var input = { ids: [id] };
-    if (expected !== undefined) input.expected = { [id]: expected };
-    var response = await fetch('/task', { method: 'POST', headers: { 'X-Analysis-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
-    var body = await response.json();
-    if (!response.ok) {
-      var error = new Error(body.error || (body.diagnostics || []).map(function (d) { return d.message; }).join(' ') || tr("Task request failed"));
-      error.status = response.status;
-      throw error;
-    }
-    return body;
-  };
   window.__archifySaveReview = async function (decision) {
     var response = await fetch('/review', { method: 'POST', headers: { 'X-Analysis-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify(decision) });
     var body = await response.json();

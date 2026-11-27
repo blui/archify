@@ -6,8 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { buildGraph, evaluateGraph, extractFacts, loadConfig, mergeConfig } from '../lib/analysis.mjs';
-import { buildTask } from '../lib/task.mjs';
-import { verifyTask } from '../lib/evidence.mjs';
+import { verifyEvidence } from '../lib/evidence.mjs';
+import { captureEvidence } from '../lib/finding-evidence.mjs';
 import { baselineFrom, reviewFindings } from '../lib/review.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
 
@@ -288,7 +288,7 @@ function checkRange(location, source) {
 }
 
 for (const sample of SAMPLES) {
-  test(`duplicates: ${sample.name} keeps real pairs, source facts and two-sided task evidence`, REAL, t => {
+  test(`duplicates: ${sample.name} keeps real pairs, source facts and two-sided evidence`, REAL, t => {
     const root = fixture(t, sample);
     const before = scan(root, sample.language);
     const sourceFiles = Object.keys(sample.files).filter(file => /\.(?:mjs|ts|py|java|go|rs)$/.test(file)).sort();
@@ -318,11 +318,9 @@ for (const sample of SAMPLES) {
       if (sample.crlf) assert(source.includes('\r\n'), 'Java/Go/Rust retain original CRLF capture');
       checkRange(location, source);
     }
-    const task = buildTask({ findings: before.findings, facts: before.facts, ids: [duplicate.id] });
-    assert.deepEqual(task.scope.modify, [sample.left, sample.right].sort());
+    const task = captureEvidence({ findings: before.findings, facts: before.facts, ids: [duplicate.id] });
     assert.equal(task.locations.length, 2);
-    assert.deepEqual(schemaErrors('ai-task', task), []);
-    assert.equal(verifyTask(task, root).evidence.status, 'valid');
+    assert.equal(verifyEvidence(task, root).evidence.status, 'valid');
 
     // The evidence/review lifecycle is shared. Exercise it once on a newly
     // supported language rather than repeating re-analysis for every parser.
@@ -332,7 +330,7 @@ for (const sample of SAMPLES) {
     for (const file of [sample.left, sample.right]) {
       fs.writeFileSync(path.join(root, file), '// unrelated preface 😀' + newline + newline + fs.readFileSync(path.join(root, file), 'utf8'));
     }
-    const moved = verifyTask(task, root);
+    const moved = verifyEvidence(task, root);
     assert.equal(moved.evidence.status, 'valid');
     for (const location of moved.locations) assert.equal(location.currentStartLine, location.startLine + 2);
     const relocated = scan(root, sample.language);
@@ -361,7 +359,7 @@ public class Right {
 }
 `;
     fs.writeFileSync(path.join(root, sample.right), replacement.replaceAll('\n', newline));
-    const changed = verifyTask(task, root);
+    const changed = verifyEvidence(task, root);
     assert.equal(changed.evidence.status, 'changed');
     assert.equal(changed.locations.find(location => location.file === sample.left).status, 'valid');
     const after = scan(root, sample.language);

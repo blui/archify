@@ -91,9 +91,7 @@ test('native PR view keeps comparison chart visible and shares localized source/
     assert.match(await run("document.getElementById('bauify-code').textContent"),/return 1/);
     assert.doesNotMatch(await run("document.getElementById('bauify-code').textContent"),/if\(x\)return 2/);
     await run("document.querySelector('[data-pr-side=head]').click();document.querySelector('#bauify-code .close').click()");
-    await run("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.prTask=text}});document.querySelector('.priority-card .quick-copy').click();new Promise(r=>setTimeout(r,100))");
-    assert.match(await run('window.prTask'),new RegExp(headSHA));
-    assert.doesNotMatch(await run('window.prTask'),/working tree was analyzed/);
+    await run("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.prTask=text}})");
     await run("document.querySelector('.brief-copy').click();new Promise(r=>setTimeout(r,100))");
     const copiedImpact=JSON.parse(await run('window.prTask'));assert.equal(copiedImpact.head,headSHA);assert.ok(copiedImpact.impact.records.length>0);assert.doesNotMatch(JSON.stringify(copiedImpact),/oldHotspot/);
   }

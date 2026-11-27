@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { startAnalysisView } from '../bin/serve.mjs';
 import { reviewTargetDigest } from '../lib/review.mjs';
 
-test('serve review: token, explicit reason, current evidence, task review and revocation share one baseline', async (t) => {
+test('serve review: token, explicit reason, current evidence and revocation share one baseline', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-external-review-http-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.writeFileSync(path.join(root, 'main.mjs'), 'export const value = 1;\n');
@@ -88,10 +88,7 @@ test('serve review: token, explicit reason, current evidence, task review and re
   assert.equal(recoveredCache.status, 200);
   assert.equal(await recoveredCache.text(), saved.body.html, 'a failed re-analysis preserves the prior successful HTML cache as well as its disk files');
   fs.writeFileSync(path.join(root, 'eslint.json'), reportBytes);
-  const task = await fetch(`${view.url}/task`, { method: 'POST', headers, body: JSON.stringify({ ids: [diagnostic.id] }) });
-  assert.equal(task.status, 200);
-  assert.equal((await task.json()).task.findings[0].review.reason, reason);
-  const tooLarge = await fetch(`${view.url}/task`, { method: 'POST', headers, body: JSON.stringify({ ids: [diagnostic.id], padding: '字'.repeat(6000) }) });
+  const tooLarge = await review({ action: 'accept', id: diagnostic.id, expected, reason: '字'.repeat(6000) });
   assert.equal(tooLarge.status, 413, 'the request limit counts bytes rather than UTF-16 characters');
 
   const report = JSON.parse(fs.readFileSync(path.join(root, 'eslint.json'), 'utf8'));
@@ -102,14 +99,6 @@ test('serve review: token, explicit reason, current evidence, task review and re
   const current = JSON.parse(fs.readFileSync(path.join(root, 'view/analysis/findings.json'), 'utf8')).diagnostics.find((d) => d.external);
   assert.equal(current.id, diagnostic.id);
   assert.notEqual(reviewTargetDigest(current), expected);
-  const taskFor = (expected) => fetch(`${view.url}/task`, { method: 'POST', headers, body: JSON.stringify({ ids: [current.id], expected }) });
-  const staleTask = await taskFor({ [current.id]: expected });
-  assert.equal(staleTask.status, 409, 'a stable source snapshot must not export a different report claim from an old page');
-  assert.equal((await staleTask.json()).diagnostics[0].code, 'task/finding-changed');
-  for (const invalid of [null, 'invalid', {}, { [current.id]: null }, { [current.id]: 'invalid' }, []]) assert.equal((await taskFor(invalid)).status, 400, 'a supplied claim map must not silently fall back to ids-only behavior');
-  const currentTask = await taskFor({ [current.id]: reviewTargetDigest(current) });
-  assert.equal(currentTask.status, 200);
-  assert.equal((await currentTask.json()).task.facts[0].statement, current.message);
   assert.equal((await review({ action: 'accept', id: diagnostic.id, expected, reason: 'from an old page' })).status, 409);
   assert.equal(fs.readFileSync(view.baseline, 'utf8'), bytes, 'a stale page cannot accept a new claim with the same finding id');
   fs.appendFileSync(path.join(root, 'main.mjs'), 'export const later = value;\n');

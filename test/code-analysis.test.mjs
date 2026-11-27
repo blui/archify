@@ -28,19 +28,14 @@ test('Code Analysis exposes the workbench, checks, task and verification command
   assert.equal(checkHelp.status, 0, checkHelp.stderr);
   assert.match(checkHelp.stdout, /archify code-analysis check <repo-root>/);
   assert.match(checkHelp.stdout, /Exit codes: 0 passed, 1 gate failed, 2 analysis or usage error/);
-  const taskHelp = run(['task', '--help']);
-  assert.equal(taskHelp.status, 0, taskHelp.stderr);
-  assert.match(taskHelp.stdout, /archify code-analysis task/);
-  const verifyHelp = run(['verify-change', '--help']);
-  assert.equal(verifyHelp.status, 0, verifyHelp.stderr);
-  assert.match(verifyHelp.stdout, /archify code-analysis verify-change <analysis-dir> --task <task.json>/);
   const other = run(['extract', path.join(moduleRoot, 'test/fixtures/ts-basic')]);
   assert.notEqual(other.status, 0);
   const operationList = other.stderr.match(/^archify code-analysis commands: (.+)\.$/m);
   assert.ok(operationList, other.stderr);
-  for (const operation of ['prepare', 'serve', 'check', 'task', 'verify-change', 'drift', 'verify-drift']) {
+  for (const operation of ['prepare', 'serve', 'check', 'drift', 'verify-drift']) {
     assert.ok(operationList[1].split(', ').includes(operation), operation);
   }
+  for (const removed of ['task', 'verify-change']) assert.ok(!operationList[1].split(', ').includes(removed), removed);
   const driftHelp = run(['drift', '--help']);
   assert.equal(driftHelp.status, 0, driftHelp.stderr);
   assert.match(driftHelp.stdout, /code-analysis drift <git-repo> --base <full-sha> --head <full-sha>/);

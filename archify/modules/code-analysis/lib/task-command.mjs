@@ -2,12 +2,6 @@
 // Keep ordinary commands readable. cmd expands %variables% even inside double
 // quotes, and !variables! when delayed expansion is enabled. For those paths,
 // pass encoded argv to Node instead of attempting another shell escape layer.
-export function taskCommand(cli, id, root, out, platform = process.platform) {
-  if (!out) return null;
-  const quote = platform === 'win32' ? cmdQuote : posixQuote;
-  return nodeCommand([cli, 'code-analysis', 'task', out, '--root', root, '--format', 'json'], platform) + ` --finding ${quote(id)}`;
-}
-
 // The command that records today's findings as a baseline, so a project can
 // adopt the rules (or a stricter rule version) without failing CI on what
 // already exists.

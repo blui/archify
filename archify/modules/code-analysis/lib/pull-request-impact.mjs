@@ -6,7 +6,7 @@ import { readCalls } from './call-reader.mjs';
 import { readIncoming, indexIncoming } from './incoming-reader.mjs';
 import { readInside } from './evidence.mjs';
 import { comparability } from './review.mjs';
-import { locationsOf } from './task.mjs';
+import { locationsOf } from './finding-locations.mjs';
 
 const LIMITS = { files: 32, definitions: 80, bytes: 4 * 1024 * 1024, records: 160, references: 5 };
 const key = (...parts) => JSON.stringify(parts);

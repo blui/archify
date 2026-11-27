@@ -70,17 +70,17 @@ test('prepared workbench localizes, copies first-screen evidence, keeps comparis
       await run('new Promise(resolve=>setTimeout(resolve,600))');
     }
     const visibility = await run(`(() => {
-      const button=document.querySelector('.priority-card .quick-copy').getBoundingClientRect();
+      const button=document.querySelector('.priority-card').getBoundingClientRect();
       const reader=document.getElementById('bauify-reader').getBoundingClientRect();
       const diagram=document.querySelector('.diagram-container').getBoundingClientRect();
       return { visible:button.width>0 && button.height>0 && button.left>=Math.max(0,reader.left) && button.right<=Math.min(innerWidth,reader.right) && button.top>=Math.max(0,reader.top) && button.bottom<=Math.min(innerHeight,reader.bottom), separate:innerWidth>1000 || diagram.top>=reader.bottom, overflow:document.documentElement.scrollWidth>innerWidth };
     })()`);
-    assert.equal(visibility.visible, true, locale + ': first task copy must be inside both reader and window without scrolling');
+    assert.equal(visibility.visible, true, locale + ': the first priority must be inside both reader and window without scrolling');
     assert.equal(visibility.separate, true, locale + ': narrow reader must not cover the canvas');
     assert.equal(visibility.overflow, false, locale + ': no horizontal page overflow');
   };
   const assertPrimaryContrast = async label => {
-    const styles = await run(`['.brief-copy','.priority-card .quick-copy'].map(selector=>{
+    const styles = await run(`['.brief-copy'].map(selector=>{
       const s=getComputedStyle(document.querySelector(selector)),surface=getComputedStyle(document.querySelector(selector).closest('#bauify-reader'));
       return {selector,color:s.color,background:s.backgroundColor,surface:surface.backgroundColor,opacity:s.opacity};
     })`);
@@ -103,11 +103,6 @@ test('prepared workbench localizes, copies first-screen evidence, keeps comparis
   // adding history banners or performing another analysis.
   const initialRead = file => JSON.parse(fs.readFileSync(path.join(out,'analysis',file)));
   const initialFindings=initialRead('findings.json');
-  const cycleId = initialFindings.diagnostics.find(f => f.code === 'coupling/import-cycle').id;
-  const analysisDir = path.join(out, 'analysis');
-  const taskFile = path.join(dir, 'task.json');
-  const task = command('task', analysisDir, '--finding', cycleId, '--format', 'json');
-  fs.writeFileSync(taskFile, JSON.stringify(task));
   const initialZh=path.join(dir,'initial-zh.html');
   fs.writeFileSync(initialZh,buildOverlay({ir:{...ir,meta:{...ir.meta,locale:'zh-CN'}},graph:initialRead('module-graph.json'),facts:initialRead('raw-facts.json'),findings:initialFindings.diagnostics,findingsDocument:initialFindings,sourceRoot:root,html:fs.readFileSync(first.diagram,'utf8'),run:{openAnalysis:true,rules:initialFindings.rules}}).html);
   for (const [locale,file] of [['en',first.html],['zh-CN',initialZh]]) {
@@ -126,17 +121,6 @@ test('prepared workbench localizes, copies first-screen evidence, keeps comparis
       const coverage = await run("document.querySelector('.coverage .cov').textContent");
       assert.match(coverage, /未检查：[^。]*重复代码/);
       assert.doesNotMatch(coverage, /\bduplication\b/);
-      await run("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.__copied=value;}}});document.querySelector('.priority-card .quick-copy').click()");
-      await run("new Promise((resolve,reject)=>{const deadline=Date.now()+3000;const poll=()=>window.__copied?resolve():Date.now()>deadline?reject(new Error('Chinese copy did not finish')):setTimeout(poll,20);poll();})");
-      const status=await run("document.querySelector('.priority-card .handoff-status').textContent");
-      assert.equal(status,'');
-      assert.equal(await run("document.querySelector('.priority-card .quick-copy').getAttribute('aria-label')"),'已复制');
-      assert.equal(await run("document.querySelector('.priority-card .quick-copy svg path').getAttribute('d')"),'m5 12 4 4L19 6');
-      assert.equal(await run("document.querySelector('.priority-card .handoff-status').getBoundingClientRect().height"),0);
-      await run("new Promise(resolve=>setTimeout(resolve,1700))");
-      assert.equal(await run("document.querySelector('.priority-card .quick-copy').getAttribute('aria-label')"),'复制任务给 AI');
-      assert.equal(await run("document.querySelector('.priority-card .quick-copy svg rect').getAttribute('width')"),'11');
-      assert.equal(await run("(()=>{const d=JSON.parse(document.getElementById('bauify-analysis').textContent);return d.tasks[d.overview.priorities[0]].task.evidence.reason;})()"),'Built from the analysis snapshot; not yet compared with the current working tree.','UI localization preserves the canonical exported evidence');
       await run("document.querySelector('.views-option[data-view=atlas]').click()");
       const selectedCycleText = await run(`(() => {
         const idx = JSON.parse(document.getElementById('bauify-atlas-data').textContent).findings.findIndex(f => f.code === 'coupling/cycle');
@@ -151,10 +135,6 @@ test('prepared workbench localizes, copies first-screen evidence, keeps comparis
   await open(first.html);
   // Observe the clipboard adapter independently of browser-owned permissions.
   await run("Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async value => { window.__copied = value; } } })");
-  await run("document.querySelector('.priority-card .quick-copy').click()");
-  const copied = await run(`new Promise((resolve,reject) => { const deadline=Date.now()+3000; const poll=()=>window.__copied?resolve(window.__copied):Date.now()>deadline?reject(new Error('first-card copy did not finish')):setTimeout(poll,20);poll();})`);
-  assert.equal(copied, await run("(() => { const data=JSON.parse(document.getElementById('bauify-analysis').textContent);return data.tasks[data.overview.priorities[0]].markdown;})()"));
-  assert.equal(await run("document.querySelector('.priority-card .handoff-status').textContent"), '');
   await run("window.__copied='';document.querySelector('.brief-copy').click()");
   assert.equal(await run('window.__copied'), await run("JSON.parse(document.getElementById('bauify-analysis').textContent).architectureBrief"));
   assert.equal(await run("document.querySelector('.brief-status').textContent"), '');
@@ -163,85 +143,27 @@ test('prepared workbench localizes, copies first-screen evidence, keeps comparis
   assert.equal(await run("document.querySelector('.brief-copy').getAttribute('aria-label')"), 'Copy architecture brief');
   assert.match(await run('window.__copied'), /does not determine runtime dispatch/);
 
-  // An HTTP refusal is not a reason to silently hand out an older offline task.
-  await run("window.__archifyBuildTask=async()=>{throw Object.assign(new Error('claim changed'),{status:409});};window.__copied='';document.querySelector('.priority-card .quick-copy').click()");
-  await run("new Promise((resolve,reject)=>{const deadline=Date.now()+3000;const poll=()=>document.querySelector('.priority-card .handoff-status').textContent.includes('claim changed')?resolve():Date.now()>deadline?reject(new Error('HTTP rejection was not reported')):setTimeout(poll,20);poll();})");
-  assert.equal(await run('window.__copied'), '');
-  assert.match(await run("document.querySelector('.priority-card .handoff-status').textContent"), /claim changed/);
-
   // Prepare a real source improvement and compare through the same saved-run path.
   fs.writeFileSync(path.join(root, 'src/beta/b.ts'), 'export function b() { return 1; }\n');
   const second = prepare('zh-CN');
   await open(second.html);
   assert.equal(await run("document.getElementById('btn-bauify').textContent"), '架构诊断');
   assert.equal(await run("document.querySelector('#bauify-reader').lang"), 'zh-CN');
-  assert.equal(await run("document.querySelector('.quick-copy').getAttribute('aria-label')"), '复制任务给 AI');
   const sourceComparison = JSON.parse(fs.readFileSync(path.join(out, 'analysis', 'review.json'))).comparison;
   assert.ok(sourceComparison.notDetected.length > 0);
   assert.ok((await run("document.querySelector('.comparison-banner').textContent")).includes(`本轮未再检出 ${sourceComparison.notDetected.length} 项 · 新增 ${sourceComparison.new.length} 项`));
   assert.match(await run("document.querySelector('.comparison-banner').textContent"), /不代表已证实修复/);
   assert.match(await run("document.querySelector('.health-summary').textContent"), /无错误级/);
 
-  const template = command('verify-change', analysisDir, '--task', taskFile, '--checks-template');
-  const checks = path.join(dir, 'checks.json');
-  fs.writeFileSync(checks, JSON.stringify({ ...template, checks: [{ name: '<img id="check-injection">', status: 'failed' }] }));
-  const expectedReceipt = command('verify-change', analysisDir, '--task', taskFile, '--checks', checks);
-  assert.equal(expectedReceipt.taskId, task.taskId);
-  assert.equal(expectedReceipt.analysis.selected[0].outcome, 'not-detected');
-  const choose = async (selector, file) => {
-    const { root } = await send('DOM.getDocument');
-    const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector });
-    await send('DOM.setFileInputFiles', { nodeId, files: [file] });
-  };
-  const submit = async () => {
-    const point = await run("(()=>{const b=document.querySelector('.verify-change button[type=submit]'); b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;return {x,y,hit:document.elementFromPoint(x,y)===b};})()");
-    assert.equal(point.hit, true, 'the receipt submit button accepts normal pointer input');
-    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1 });
-    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 });
-    await run("new Promise((resolve,reject)=>{const deadline=Date.now()+3000;const poll=()=>document.querySelector('.verify-preview').textContent||document.querySelector('.verify-status').textContent?resolve():Date.now()>deadline?reject(new Error('receipt did not finish')):setTimeout(poll,20);poll();})");
-  };
-  // The receipt form lives in the reader, which starts closed beside the diagram; opening it renders the overview.
+  // The reader starts closed beside the diagram; opening it renders the overview.
   if (await run("document.getElementById('bauify-reader').classList.contains('fly-closed')")) {
     await run("document.querySelector('#bauify-stage .first-all').click()");
     await run('new Promise(resolve=>setTimeout(resolve,600))');
   }
-  await run("document.querySelector('.verify-change summary').click()");
-  const wrongTask = path.join(dir, 'wrong-task-id.json');
-  const otherId = task.taskId.slice(0, -1) + (task.taskId.endsWith('0') ? '1' : '0');
-  fs.writeFileSync(wrongTask, JSON.stringify({ ...task, taskId: otherId }));
-  const rejected = spawnSync(process.execPath, [cli, 'code-analysis', 'verify-change', analysisDir, '--task', wrongTask], { encoding: 'utf8' });
-  assert.equal(rejected.status, 2, rejected.stdout + rejected.stderr);
-  assert.equal(JSON.parse(rejected.stdout).diagnostics[0].code, 'verification/wrong-task-id');
-  await choose('.verify-task', wrongTask);
-  await submit();
-  assert.match(await run("document.querySelector('.verify-status').textContent"), /任务 ID 与所选发现不匹配/);
-  assert.equal(await run("document.querySelector('.verify-download').disabled"), true);
-  await choose('.verify-task', taskFile);
-  await submit();
-  assert.match(await run("document.querySelector('.verify-preview').textContent"), /未再检出.*没有报告项目检查结果/s);
-  await choose('.verify-checks', checks);
-  await submit();
-  assert.match(await run("document.querySelector('.verify-preview').textContent"), /Archify 没有运行或独立核验这些检查。.*<img id="check-injection"> · 失败/s);
-  assert.equal(await run("Boolean(document.getElementById('check-injection'))"), false);
-  const downloads = path.join(dir, 'downloads');
-  fs.mkdirSync(downloads);
-  await browser.cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
-  await run("document.querySelector('.verify-download').click()");
-  const downloaded = path.join(downloads, task.taskId + '.verification.json');
-  for (let tries = 0; !fs.existsSync(downloaded) && tries < 60; tries++) await new Promise(resolve => setTimeout(resolve, 50));
-  assert.deepEqual(JSON.parse(fs.readFileSync(downloaded, 'utf8')), expectedReceipt);
-  const stale = path.join(dir, 'stale-checks.json');
-  fs.writeFileSync(stale, JSON.stringify({ ...template, after: { ...template.after, analysisSha256: '0'.repeat(64) } }));
-  await choose('.verify-checks', stale);
-  await submit();
-  assert.match(await run("document.querySelector('.verify-status').textContent"), /快照对不匹配/);
-  assert.equal(await run("document.querySelector('.verify-download').disabled"), true);
-  await run("document.querySelector('.verify-change summary').click()");
   await run("document.querySelector('.browse-findings').click();const search=document.querySelector('.finding-search');search.value='复杂';search.dispatchEvent(new Event('input'));");
   assert.ok(await run("document.querySelectorAll('.finding-list [data-finding]').length > 0"), 'Chinese search matches the visible localized title');
   await run("document.querySelector('.findings-back').click()");
   await run("document.querySelector('.priority-card [data-finding]').click()");
-  assert.equal(await run("document.querySelector('#bauify-detail .quick-copy').getAttribute('aria-label')"), '复制任务给 AI');
   assert.equal(await run("Boolean(document.querySelector('#bauify-detail .finding.warning'))"), true, 'zh-CN detail keeps canonical severity CSS class');
   assert.match(await run("document.querySelector('#bauify-detail').textContent"), /源码证据/);
   await run("document.querySelector('#bauify-detail .back').click()");

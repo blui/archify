@@ -582,7 +582,7 @@
     if (!externalGroup) h += ("<details class=\"relationship\">" + "<summary>" + tr("Relationships and metrics") + "</summary>") + diagram(c, key, fl) + '</details>';
     h += ("<div class=\"k\">" + tr("Findings · ")) + fl.length + '</div>';
     if (!fl.length) h += '<div class="ev">' + (key === 'instability' ? tr("Instability measures dependency direction: out / (in + out). 0 = no outgoing dependencies, 1 = no incoming dependents. It is not a failure probability or a quality verdict.") : tr("No finding for this indicator; this is not a safety guarantee.")) + '</div>';
-    fl.forEach(function (f) { h += f.external ? findingListRow(f) : quickHandoff(f) + evidencePreview(f) + findingCard(f) + taskHtml(f); });
+    fl.forEach(function (f) { h += f.external ? findingListRow(f) : evidencePreview(f) + findingCard(f); });
     detail.innerHTML = h;
     detail.hidden = false;
     codePane.hidden = true;
@@ -590,7 +590,6 @@
     detail.querySelector('.close').addEventListener('click', backToComponent);
     detail.querySelector('.back').addEventListener('click', backToComponent);
     wireRefs();
-    wireTasks();
     detail.querySelectorAll('[data-finding]').forEach(function (button) { button.addEventListener('click', function () { showFinding(button.getAttribute('data-finding')); }); });
   }
   function wireRefs() {
@@ -683,7 +682,7 @@
   function priorityCard(id, n) {
     var f = findingById[id]; if (!f) return '';
     var tone = toneOf(f.severity), label = tr(f.severity), mark = { red: '×', amber: '!', blue: 'i' }[tone];
-    return '<article class="priority-card">' + findingRow(id, n) + '<span class="priority-level ' + tone + '" tabindex="0" role="img" aria-label="' + esc(label + ': ' + LEVELS[tone].text) + '" data-analysis-tip="' + esc(label + ': ' + LEVELS[tone].text) + '">' + mark + '</span>' + quickHandoff(f, true) + taskHtml(f) + '</article>';
+    return '<article class="priority-card">' + findingRow(id, n) + '<span class="priority-level ' + tone + '" tabindex="0" role="img" aria-label="' + esc(label + ': ' + LEVELS[tone].text) + '" data-analysis-tip="' + esc(label + ': ' + LEVELS[tone].text) + '">' + mark + '</span>' + '</article>';
   }
   var CATEGORIES = { coupling: tr("Dependencies"), complexity: tr("Complexity"), redundancy: tr("Duplicate code"), architecture: tr("Architecture"), conventions: tr("Coding conventions") };
   function externalSources() { return (data.overview && data.overview.coverage && data.overview.coverage.external) || []; }
@@ -887,19 +886,7 @@
     record.locations.forEach(function(loc,i){h+='<button type="button" class="text-action" data-impact-location="'+index+':'+i+'">'+esc(tr(loc.side === 'base' ? 'Pinned base' : 'Pinned head'))+' · '+esc(loc.file+':'+loc.line)+(loc.relation?' · '+esc(tr(loc.relation==='bound-call'?'Bound source call':'File import')):'')+(loc.unchanged?' · '+esc(tr('unchanged file')):'')+'</button>';});
     (record.contexts||[]).forEach(function(context){h+='<p class="pr-assessment-scope">'+esc(tr('Related existing constraint'))+' · <button type="button" class="text-action" data-finding="'+esc(context.id)+'">'+esc(GROUPS[context.code]||context.code)+'</button></p>';});
     h+='</details>';
-    if(finding)h+=quickHandoff(finding,true)+taskHtml(finding);
     return h+'</article>';
-  }
-  function verificationHtml() {
-    var title = '<details class="verify-change"><summary>' + esc(tr('Verify a previous task')) + '</summary>';
-    if (!data.verification) return title + '<p class="ev">' + esc(tr('Download the task JSON before editing, then re-analyze using the same output directory.')) + '</p></details>';
-    return title + '<p class="ev">' + esc(tr('Run project checks separately. This receipt compares captured analyses and records your reported check results.')) + '</p>'
-      + '<form><label>' + esc(tr('Task JSON from the previous run')) + '<input type="file" accept=".json,application/json" class="verify-task" required></label>'
-      + '<label>' + esc(tr('Project check results JSON (optional)')) + '<input type="file" accept=".json,application/json" class="verify-checks"></label>'
-      + '<div class="task-actions"><button type="submit">' + esc(tr('Preview verification')) + '</button></div></form>'
-      + '<p class="verify-status ev" role="status"></p><div class="verify-preview" aria-live="polite"></div><div class="task-actions">'
-      + '<button type="button" class="verify-template" disabled>' + esc(tr('Download checks template')) + '</button>'
-      + '<button type="button" class="verify-download" disabled>' + esc(tr('Download verification JSON')) + '</button></div></details>';
   }
   function renderOverview() {
     var o = data.overview;
@@ -932,9 +919,9 @@
     h += '<details class="architecture-brief-preview" hidden><summary>' + esc(tr('Copy manually')) + '</summary><textarea readonly spellcheck="false" aria-label="' + esc(tr('Architecture brief')) + '"></textarea></details>';
     var offline = '';
     if (!live) {
-      offline += '<details class="offline-recheck"><summary>' + esc(tr('Recheck after edits')) + '</summary><p class="ev">' + esc(tr('Offline report: captured tasks can be copied now. Current source has not been rechecked.')) + '</p>';
+      offline += '<details class="offline-recheck"><summary>' + esc(tr('Recheck after edits')) + '</summary><p class="ev">' + esc(tr('Offline report: current source has not been rechecked.')) + '</p>';
       if (data.ui && data.ui.resume && data.ui.resume.command) offline += '<p class="ev">' + esc(tr(standalone ? 'Run this command on the generating machine and open the printed URL to compare with this report. Later edits use Re-analyze. The command never runs automatically.' : 'Run this command on the generating machine, open the printed URL and choose Code Analysis to compare with this report. Later edits use Re-analyze. The command never runs automatically.')) + '</p><textarea readonly class="start-command" aria-label="' + esc(tr('Recheck after edits')) + '">' + esc(data.ui.resume.command) + '</textarea><button type="button" class="start-copy">' + esc(tr('Copy start command')) + '</button><p class="start-status ev" role="status" aria-live="polite"></p>';
-      else offline += '<p class="ev">' + esc(tr('This report has no saved start command. Ask your AI to prepare a fresh analysis from the original repository and architecture JSON.')) + '</p>';
+      else offline += '<p class="ev">' + esc(tr('This report has no saved start command. Run a fresh analysis from the original repository and architecture JSON.')) + '</p>';
       offline += '</details>';
     }
     h += '<div class="section-heading' + (data.pullRequest ? ' pr-review-heading' : '') + '"><h4>' + esc(tr(data.pullRequest ? 'PR review priorities' : o.priorities.length ? 'Look at first' : 'Architecture brief')) + '</h4>' + iconButton('copy', tr(data.pullRequest ? 'Copy PR impact brief' : 'Copy architecture brief'), ' brief-copy') + '</div>';
@@ -942,7 +929,7 @@
     else if (o.priorities.length) {
       o.priorities.forEach(function (id, i) { h += priorityCard(id, i + 1); });
     } else h += '<p class="ev">' + esc(tr('No open findings within the checks that ran. Accepted findings and coverage remain below.')) + '</p>';
-    h += verificationHtml() + offline;
+    h += offline;
     var architecture = o.investigation && o.investigation.architecture;
     if (!data.pullRequest && architecture && architecture.structuralSignals.length) {
       h += '<details class="structural-signals"><summary>' + esc(tr('Additional structural signals')) + ' · ' + architecture.structuralSignals.length + '</summary>';
@@ -995,7 +982,6 @@
           function () { button.focus({ preventScroll: true }); }, tr('Review'));
       });
     });
-    window.__archifyWireVerification(overview, data.verification, tr);
     overview.querySelector('.browse-findings').addEventListener('click', function () { showFindings('all'); });
     var externalButton = overview.querySelector('.external-findings'); if (externalButton) externalButton.addEventListener('click', function () { showFindings('external'); });
     var sourceButton = overview.querySelector('.overview-sources'); if (sourceButton) sourceButton.addEventListener('click', showSources);
@@ -1018,7 +1004,6 @@
       window.__archifyReanalyze().catch(function (error) { again.disabled = false; again.classList.remove('busy'); again.removeAttribute('aria-busy'); note.classList.add('reanalyze-error'); note.textContent = tr('Re-analysis failed: ') + error.message + tr(' The result shown is from the last successful run.'); });
     });
     overview.querySelectorAll('[data-finding]').forEach(function (el) { el.addEventListener('click', function () { showFinding(el.getAttribute('data-finding')); }); });
-    wireTasks(overview);
   }
   async function copyText(text, status, preview, success, box) {
     preview.value = text;
@@ -1077,8 +1062,7 @@
   function evidencePreview(f) {
     if (f.external) return externalEvidence(f);
     if (f.code === 'redundancy/duplicate-block') return duplicateEvidence(f);
-    var captured = (data.tasks || {})[f.id];
-    var locations = captured ? captured.task.locations.filter(function (l) { return l.startLine; }).slice(0, 2) : [];
+    var locations = ((data.findingLocations || {})[f.id] || []).slice(0, 2);
     if (!locations.length && f.subject && f.subject.file && f.subject.line) locations = [{ file: f.subject.file, startLine: f.subject.line, endLine: f.subject.endLine }];
     if (!locations.length) locations = (f.evidence && f.evidence.imports || []).slice(0, 2).map(function (v) { return { file: v.file, startLine: v.line, endLine: v.line }; });
     return locations.map(function (loc) {
@@ -1091,9 +1075,6 @@
       h += ("</pre>" + "<div class=\"ev\">" + tr("Captured lines ")) + (start + 1) + '–' + end + tr(" of ") + snip.lines.length + (tr(" · excerpt only; click the path to expand.") + "</div>" + "</div>");
       return h;
     }).join('');
-  }
-  function taskHtml(f) {
-    return '<details class="ai-task" data-task-id="' + esc(f.id) + ("\">" + "<summary>" + tr("Task preview and download") + "</summary>" + "<p class=\"ev\">" + tr("Review the brief, then give it to your coding AI. Exporting does not modify code.") + "</p>" + "<p class=\"task-status ev\" role=\"status\" aria-live=\"polite\">" + tr("Open to prepare the task.") + "</p>" + "<div class=\"task-actions\">" + "<button type=\"button\" class=\"task-copy\" disabled>" + tr("Copy AI task") + "</button>" + "<button type=\"button\" class=\"task-download\" disabled>" + tr("Download .md") + "</button>" + "<button type=\"button\" class=\"task-json\" disabled>" + esc(tr("Download task JSON")) + "</button>" + "<button type=\"button\" class=\"task-refresh\">" + tr("Check again") + "</button>" + "</div>" + "<label class=\"ev\">" + tr("Task preview · select text to copy manually") + "<textarea class=\"task-preview\" readonly spellcheck=\"false\" aria-label=\"" + tr("AI task preview") + "\">" + "</textarea>" + "</label>" + "</details>");
   }
   function externalEvidence(f) {
     var locations = f.external.locations || [];
@@ -1123,7 +1104,7 @@
     var accepted = f.review && f.review.status === 'accepted', changed = f.review && f.review.status === 'accepted-changed';
     var available = typeof window.__archifySaveReview === 'function' && f.reviewTarget;
     return ("<section class=\"finding-review\" aria-label=\"" + tr("Review decision") + "\">") + (f.review && f.review.reason ? '<p class="review-reason"><b>' + (changed ? tr("Accepted evidence changed · review again") : tr("Accepted in baseline")) + '</b><span>' + esc(f.review.reason) + '</span>' + (f.severity === 'error' ? ("<span>" + tr("This diagnostic is still present at error severity.") + "</span>") : '') + '</p>' : '') +
-      '<div class="review-primary-actions">' + (f.external ? ("<button type=\"button\" class=\"preview-external-task\">" + tr("Preview AI task") + "</button>") : '') + '<button type="button" class="review-action"' + (!available || !accepted && f.external && f.external.binding === 'changed' ? ' disabled' : '') + '>' + (accepted ? tr("Revoke acceptance") : changed ? tr("Accept updated finding…") : tr("Accept…")) + '</button>' + (changed ? '<button type="button" class="review-revoke"' + (typeof window.__archifySaveReview !== 'function' ? ' disabled' : '') + (">" + tr("Revoke acceptance") + "</button>") : '') + '</div>' +
+      '<div class="review-primary-actions">' + '<button type="button" class="review-action"' + (!available || !accepted && f.external && f.external.binding === 'changed' ? ' disabled' : '') + '>' + (accepted ? tr("Revoke acceptance") : changed ? tr("Accept updated finding…") : tr("Accept…")) + '</button>' + (changed ? '<button type="button" class="review-revoke"' + (typeof window.__archifySaveReview !== 'function' ? ' disabled' : '') + (">" + tr("Revoke acceptance") + "</button>") : '') + '</div>' +
       (!available ? ("<p class=\"ev\">" + tr("Open with the local analysis service to save baseline decisions.") + "</p>") : '') +
       ("<form class=\"review-form\" hidden>" + "<label>" + tr("Reason for accepting ") + "<span>" + tr("(required)") + "</span>" + "<textarea name=\"reason\" required rows=\"3\" placeholder=\"" + tr("Why is this acceptable in this project?") + "\">") + esc(changed && f.review.reason || '') + ("</textarea>" + "</label>" + "<p class=\"ev\">" + tr("Records a baseline decision. The original diagnostic and severity stay visible.") + "</p>" + "<div class=\"review-actions\">" + "<button type=\"submit\" class=\"review-confirm\" disabled>" + tr("Confirm acceptance") + "</button>" + "<button type=\"button\" class=\"review-cancel\">" + tr("Cancel") + "</button>" + "</div>" + "</form>" + "<p class=\"review-status ev\" role=\"status\" aria-live=\"polite\">" + "</p>" + "</section>");
   }
@@ -1132,7 +1113,6 @@
     var action = box.querySelector('.review-action'), form = box.querySelector('form'), reason = box.querySelector('textarea'), confirm = box.querySelector('.review-confirm'), cancel = box.querySelector('.review-cancel'), status = box.querySelector('.review-status');
     var accepted = f.review && f.review.status === 'accepted';
     var revoke = box.querySelector('.review-revoke'), actionInitiallyDisabled = action.disabled;
-    var previewTask = box.querySelector('.preview-external-task'); if (previewTask) previewTask.addEventListener('click', function () { var task = detail.querySelector('.ai-task'); task.open = true; task.scrollIntoView({ block: 'nearest' }); });
     var update = function () { confirm.disabled = !reason.value.trim(); };
     reason.addEventListener('input', update);
     var save = async function (kind) {
@@ -1150,77 +1130,6 @@
     cancel.addEventListener('click', function () { form.hidden = true; action.hidden = false; detail.classList.remove('reviewing'); status.textContent = ''; action.focus(); });
     form.addEventListener('submit', function (event) { event.preventDefault(); if (reason.value.trim()) save('accept'); });
     try { var notice = sessionStorage.getItem(filterKey + ':notice'); if (notice) { status.textContent = notice; sessionStorage.removeItem(filterKey + ':notice'); } } catch (error) { /* No storage. */ }
-  }
-  function quickHandoff(f, compact) {
-    var button = iconButton('copy', tr('Copy task for AI'), ' quick-copy');
-    var status = '<p class="ev handoff-status" role="status" aria-live="polite">' + (compact ? '' : tr('Includes evidence, suggestions and allowed files. Paste it into your coding AI.')) + '</p>';
-    return '<div class="quick-handoff' + (compact ? ' compact' : '') + '" data-handoff-id="' + esc(f.id) + '">' + (compact ? button : '<div class="task-actions">' + button + '</div>') + status + '</div>';
-  }
-  function wireTasks(container) {
-    container = container || detail;
-    container.querySelectorAll('.ai-task').forEach(function (box) {
-      var id = box.getAttribute('data-task-id'), payload = null, busy = false;
-      var status = box.querySelector('.task-status'), preview = box.querySelector('.task-preview');
-      var copy = box.querySelector('.task-copy'), download = box.querySelector('.task-download'), refresh = box.querySelector('.task-refresh');
-      var downloadJson = box.querySelector('.task-json');
-      var quick = container.querySelector('[data-handoff-id="' + id + '"]');
-      var quickCopy = quick && quick.querySelector('.quick-copy');
-      var say = function (text, previewOnly) { status.textContent = text; if (quick) quick.querySelector('.handoff-status').textContent = previewOnly ? '' : text; };
-      var describe = function (p) {
-        var e = p.task.evidence;
-        var labels = { valid: tr("Evidence matches the current working tree."), captured: tr("Snapshot only; current source has not been checked. Ask your coding AI to verify it before editing."), changed: tr("Evidence changed. Re-analyze and review the current code before editing."), missing: tr("A cited file is missing. Re-analyze before editing."), unverifiable: tr("Evidence could not be verified. Read the cited files before editing.") };
-        return (labels[e.status] || tr("Evidence status unknown.")) + (e.reason ? ' ' + tr(e.reason) : '') + (e.checkedAt ? tr(" Checked ") + e.checkedAt + '.' : '');
-      };
-      var prepare = async function () {
-        if (busy) return null;
-        busy = true; copy.disabled = download.disabled = downloadJson.disabled = refresh.disabled = true;
-        if (quickCopy) quickCopy.disabled = true;
-        say(tr("Preparing task and checking available evidence…"), true);
-        try {
-          var note = '';
-          if (typeof window.__archifyBuildTask === 'function') {
-            try { payload = await window.__archifyBuildTask(id, findingById[id].reviewTarget); }
-            catch (error) {
-              if (error.status) throw error;
-              payload = (data.tasks || {})[id];
-              note = tr("Local service unavailable. ");
-            }
-          } else { payload = (data.tasks || {})[id]; note = tr("Offline report. "); }
-          if (!payload) throw new Error(tr("Task source is unavailable. Re-analyze with the local service to create this task."));
-          if (data.repository.snapshotId && payload.task.source.snapshotId && data.repository.snapshotId !== payload.task.source.snapshotId) throw new Error(tr("The service has a newer analysis snapshot than this page. Re-analyze to refresh the displayed evidence."));
-          preview.value = payload.markdown;
-          say(note + describe(payload), true);
-          return payload;
-        } catch (error) {
-          payload = null; preview.value = '';
-          say(tr("Could not prepare task: ") + error.message + tr(" Re-analyze if this page shows an older result, then retry."));
-          return null;
-        } finally { busy = false; copy.disabled = download.disabled = downloadJson.disabled = !payload; refresh.disabled = false; if (quickCopy) quickCopy.disabled = false; }
-      };
-      box.addEventListener('toggle', function () { if (box.open && !payload && !busy) prepare(); });
-      refresh.addEventListener('click', prepare);
-      var copyTask = async function () {
-        var p = await prepare(); if (!p || !box.isConnected) return;
-        try {
-          if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error(tr("Clipboard unavailable"));
-          await navigator.clipboard.writeText(p.markdown);
-          if (quickCopy) confirmCopy(quickCopy);
-          else say(tr('Copied AI task. Paste it into your coding AI. ') + describe(p));
-        } catch (error) { box.open = true; preview.focus(); preview.select(); say(tr("Automatic copy unavailable. The task text is selected; press Ctrl+C or copy it manually. ") + describe(p)); }
-      };
-      copy.addEventListener('click', copyTask);
-      if (quickCopy) quickCopy.addEventListener('click', copyTask);
-      downloadJson.addEventListener('click', function () {
-        if (payload) window.__archifyDownloadJson(payload.task, payload.task.taskId + '.json');
-      });
-      download.addEventListener('click', async function () {
-        var p = await prepare(); if (!p || !box.isConnected) return;
-        var url = URL.createObjectURL(new Blob([p.markdown], { type: 'text/markdown;charset=utf-8' }));
-        var link = document.createElement('a'); link.href = url; link.download = p.task.taskId + '.md'; document.body.appendChild(link); link.click(); link.remove();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-        say(tr("Download requested. ") + describe(p));
-      });
-    });
   }
   function showFinding(id, parent) {
     var f = findingById[id]; if (!f) return;
@@ -1244,7 +1153,7 @@
       if (f.message !== findingTitle(f)) h += '<div class="external-message">' + esc(f.message) + '</div>';
       h += ("<dl class=\"external-facts evidence-state\">" + "<div>" + "<dt>" + tr("Source snapshot") + "</dt>" + "<dd>" + tr("Captured at analysis time") + "</dd>" + "</div>" + "<div>" + "<dt>" + tr("Report binding") + "</dt>" + "<dd>") + esc(bindingLabel(f.external.binding)) + '</dd></div></dl>';
       if (f.external.binding !== 'verified') h += '<p class="external-notice">' + (f.external.binding === 'changed' ? tr("The report describes an older source version. Regenerate the source report before accepting this finding.") : tr("The report is not bound to a verified source version. Check the claim against current code; this limitation is included in the task.")) + '</p>';
-      h += evidencePreview(f) + reviewHtmlForFinding(f) + taskHtml(f) + externalProvenance(f);
+      h += evidencePreview(f) + reviewHtmlForFinding(f) + externalProvenance(f);
       if (!standalone && !(f.componentIds || []).length) h += ("<p class=\"ev\">" + tr("Not mapped to this diagram. The source location and task remain available.") + "</p>");
     } else {
     if (f.code !== 'redundancy/duplicate-block') h += '<div class="k">' + esc(GROUPS[f.code] || f.code) + ' · ' + esc(scope.label) + '</div>';
@@ -1255,9 +1164,8 @@
       : f.code === 'coupling/internal-leak' ? (f.evidence && f.evidence.entrySource === 'config' ? tr("These imports bypass the entry files declared in the analysis config.") : tr("Other modules depend on this module's internal files, so moving or renaming any of them breaks importers. Deep imports can be a deliberate convention; this is a signal, not a defect."))
       : f.code === 'complexity/function' ? tr("Cyclomatic complexity counts independent paths through the function. A high count is a maintenance signal, not a defect.") : lvl.text;
     h += '<div class="level"><b>' + esc(tr(lvl.name)) + '</b> — ' + esc(findingWhat(f)) + (f.code === 'redundancy/duplicate-block' ? '' : '<br>' + esc(explanation)) + '</div>' + locationHtml;
-    h += (f.code === 'redundancy/duplicate-block' ? '' : quickHandoff(f)) + ("<div class=\"k evidence-label\">" + tr("Code evidence") + "</div>") + evidencePreview(f) + reviewHtmlForFinding(f);
-    if (f.code === 'redundancy/duplicate-block') h += quickHandoff(f);
-    h += nextStepHtml(f) + taskHtml(f);
+    h += ("<div class=\"k evidence-label\">" + tr("Code evidence") + "</div>") + evidencePreview(f) + reviewHtmlForFinding(f);
+    h += nextStepHtml(f);
     if ((f.componentIds || []).length) h += ("<button type=\"button\" class=\"locate\">" + tr("Locate related components") + "</button>");
     else if (!standalone) h += ("<p class=\"ev\">" + tr("Not mapped to this diagram. Use the code evidence above.") + "</p>");
     var pic = f.code === 'coupling/import-cycle' || f.code === 'coupling/cycle' ? cycleDiagram(scope, [f]) : f.code === 'coupling/hub' ? hubDiagram(scope, [f]) : f.code === 'architecture/boundary' ? boundaryDiagram([f]) : f.code === 'complexity/function' ? complexityDiagram([f]) : '';
@@ -1275,7 +1183,6 @@
     if (locate) locate.addEventListener('click', function () { locateComponents(f.componentIds, true); });
     detail.querySelectorAll('[data-finding]').forEach(function (el) { el.addEventListener('click', function () { showFinding(el.getAttribute('data-finding')); }); });
     wireRefs();
-    wireTasks();
     wireReview(f, parent);
     var heading = detail.querySelector('h3'); heading.tabIndex = -1; heading.focus({ preventScroll: true });
   }

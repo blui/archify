@@ -1,6 +1,6 @@
-// Evidence check: is what a task (or a finding) cites still what the working
+// Evidence check: is what a finding cites still what the working
 // tree contains? Compares the analysis snapshot with the current files and
-// reports, per location, per finding and for the whole task, one of
+// reports, per location, per finding and for the whole selection, one of
 //   valid         the cited lines are unchanged (possibly moved; see currentStartLine)
 //                 and the finding's evidence digest still matches
 //   changed       the cited lines, or other code the finding depends on, changed
@@ -16,7 +16,7 @@
 // in a cycle's files still marks the finding changed even when the cited
 // import lines are intact.
 //
-// Paths come from a task file that may have been edited or shared: they are
+// Paths come from saved analysis output that may have been edited: they are
 // resolved inside `root` only (no absolute paths, no `..`, no symlink
 // escapes). The check reads files; it never runs project code.
 import { createHash } from 'node:crypto';
@@ -131,8 +131,8 @@ export function digestMatches(digest, readFile, shift = null) {
   return combinations > MAX_DIGEST_CANDIDATES ? null : false;
 }
 
-// Returns a copy of the task with evidence status set from the current tree.
-export function verifyTask(task, root, { now = new Date() } = {}) {
+// Returns a copy of the captured evidence with its status set from the current tree.
+export function verifyEvidence(task, root, { now = new Date() } = {}) {
   const cache = new Map();
   const readFile = (rel) => { if (!cache.has(rel)) cache.set(rel, readInside(root, rel)); return cache.get(rel); };
   const rangeFindings = new Set(task.findings.filter((f) => f.evidenceDigest?.ranges).map((f) => f.id));

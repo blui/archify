@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { buildGraph, evaluateGraph, extractFacts, loadConfig } from '../lib/analysis.mjs';
 import { buildAtlas, moduleLabels } from '../overlay/atlas.mjs';
 import { buildOverlay } from '../overlay/inject.mjs';
-import { copySource, SOURCE } from './task-fixtures.mjs';
+import { copySource, SOURCE } from './py-fixture.mjs';
 import path from 'node:path';
 
 function analyze(t) {

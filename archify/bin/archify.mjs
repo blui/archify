@@ -2194,11 +2194,8 @@ const COMMAND_USAGE = {
     'prepare <repo-root> --out <dir> [--ir <architecture.json>] [--locale en|zh-CN] [--language ts|py|java|go|rust] [--map file] [--config file] [--baseline file] [--quality standard|showcase] [--base <commit> --head <commit>] [--scope path]',
     'serve <repo-root> --out <dir> [--ir <architecture.json>] [--locale en|zh-CN] [--language ts|py|java|go|rust] [--map file] [--config file] [--baseline file] [--quality standard|showcase] [--base <commit> --head <commit>] [--scope path]',
     'check <repo-root> [--language ts|py|java|go|rust] [--config file] [--ir <architecture.json> [--map file]] [--baseline file] [--compare findings.json] [--out dir] [--fail-on error|warning|info|never] [--new-only] [--update-baseline | --accept id | --revoke id] [--reason text] [--json]',
-    'verify-change <analysis-dir> --task <task.json> [--checks <checks.json> | --checks-template]',
     'drift <git-repo> --base <full-sha> --head <full-sha> --ir <architecture.json> --out <new-directory> [--map file] [--config file] [--from-report <original-drift.json>] [--locale en|zh-CN] [--json]',
     'verify-drift <original-drift.json> --task <task.json> --after <follow-up-drift.json> [--checks <checks.json> | --checks-template]',
-    'task <analysis-dir> --finding <id> [--finding <id> …] [--root <repo-root>] [--command cmd] [--format md|json] [--out file] [--require-valid]',
-    'task --verify <task.json> --root <repo-root> [--format md|json] [--out file] [--require-valid]',
   ],
   render: '<type> <input.json> [output.html] [--quality standard|showcase] [--repo-root path]',
   compare: 'architecture <base.json> <head.json> [output.html] [--receipt path] [--json] [--quality standard|showcase] [--repo-root path]',
@@ -7128,10 +7125,9 @@ try {
     case 'code-analysis': {
       // serve: deliver the authored diagram, serve it, analyze on click.
       // check: headless analysis with baseline, comparison and an exit code for CI.
-      // task: an AI optimization task from a finished run, with an evidence check.
-      const commands = { prepare: 'prepare.mjs', serve: 'serve.mjs', check: 'check.mjs', task: 'task.mjs', 'verify-change': 'verify-change.mjs', drift: 'drift.mjs', 'verify-drift': 'verify-drift.mjs' };
+      const commands = { prepare: 'prepare.mjs', serve: 'serve.mjs', check: 'check.mjs', drift: 'drift.mjs', 'verify-drift': 'verify-drift.mjs' };
       if (!commands[args[0]]) {
-        console.error(`archify code-analysis commands: prepare, serve, check, task, verify-change, drift, verify-drift.\n${usage()}`);
+        console.error(`archify code-analysis commands: prepare, serve, check, drift, verify-drift.\n${usage()}`);
         process.exitCode = 1;
         break;
       }

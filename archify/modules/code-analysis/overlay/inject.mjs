@@ -33,11 +33,9 @@ import path from 'node:path';
 import { fail } from '../core/index.mjs';
 import { sourceChanges } from './source-changes.mjs';
 import { buildOverview } from './overview.mjs';
-import { buildTaskPayloads } from '../lib/task.mjs';
+import { locationsOf } from '../lib/finding-locations.mjs';
 import { reviewTargetDigest } from '../lib/review.mjs';
 import { buildAtlas, buildAtlas3dDetail, ATLAS_CSS, ATLAS_JS, ATLAS3D_CSS, ATLAS3D_JS, threeJs } from './atlas.mjs';
-import { createTaskId } from '../lib/task-id.mjs';
-import { evaluateVerification } from '../lib/verification.mjs';
 import { clientAsset } from './client-assets.mjs';
 import { resolveMapping } from '../lib/diagram-mapping.mjs';
 
@@ -146,8 +144,9 @@ export function buildOverlay({ ir, graph, html, map, facts = null, findings = []
     unmapped,
     ambiguousModules,
     findings: listed,
-    verification: run.verification || null,
-    tasks: facts && findingsDocument ? buildTaskPayloads({ findings: findingsDocument, facts, review: run.review }) : {},
+    // Up to two cited line ranges per finding, for the evidence excerpt in its detail view.
+    findingLocations: Object.fromEntries(listed.filter((f) => !f.external).map((f) => [f.id, locationsOf(f).filter((loc) => loc.startLine).slice(0, 2)
+      .map(({ file, startLine, endLine }) => ({ file, startLine, endLine }))]).filter(([, locations]) => locations.length)),
     overview: buildOverview({ findings: listed, graph, facts, unmapped: ir ? unmapped : [], ambiguousModules, run, diagram: Boolean(ir) }),
     snippets: sourceRoot ? collectSnippets(findings, sourceRoot, components.concat(unmapped.filter((m) => listed.some((f) => (f.moduleIds || []).includes(m.id))), { fileList: [...(run.pullRequest?.changedFiles || []).map(file => ({ path: file.path })), ...(run.pullRequest?.impact?.records || []).flatMap(record => record.locations.map(item => ({ path: item.file }))), ...(pr?.componentDrift?.edges || []).flatMap(edge => [...edge.base, ...edge.head])] }), facts, findingsDocument?.externalEvidence, run.pullRequest) : {},
   };
@@ -414,6 +413,4 @@ function collectSnippets(findings, sourceRoot, components, facts, externalEviden
 const CSS = clientAsset('overlay.css') + clientAsset('entry.css');
 
 const JS = `window.__archifyMakeAnalysisTranslator = ${createTranslator.toString()};\n`
-  + `window.__archifyCreateVerificationTaskId = ${createTaskId.toString()};\n`
-  + `window.__archifyEvaluateVerification = ${evaluateVerification.toString()};\n`
-  + clientAsset('verification.js') + clientAsset('overlay.js');
+  + clientAsset('overlay.js');

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { evaluate } from '../evaluate/index.mjs';
 import { thresholds } from '../evaluate/rules/coupling/concentration.mjs';
-import { buildTask } from '../lib/task.mjs';
 import { DiagnosticError } from '../core/index.mjs';
 import { schemaErrors } from '../schemas/index.mjs';
 
@@ -104,7 +103,7 @@ test('concentration: the rule is versioned in the analysis context and can be sw
   assert.ok(!off.rules.includes(CODE) || off.summary.suppressed >= 1);
 });
 
-test('concentration: an AI task states which number has to move, or that the finding may be accepted', () => {
+test('concentration: a file-size finding pins the file text in its evidence digest', () => {
   const graph = graphOf([['a', 'b']], {}, { fileModules: { 'a/huge.mjs': 'a' } });
   const source = Array.from({ length: 1600 }, (_, i) => `export const v${i} = ${i};`).join('\n') + '\n';
   const facts = { schema_version: 1, repository: graph.repository, symbols: [], calls: [], imports: [], unresolved: { external: 0, outside: 0, unknown: 0, opaque: 0 },
@@ -112,9 +111,4 @@ test('concentration: an AI task states which number has to move, or that the fin
   const findings = evaluate(graph, {}, facts);
   const finding = only(findings)[0];
   assert.ok(finding.evidenceDigest, 'the file text is pinned so an accepted finding is re-opened when it changes');
-  const task = buildTask({ findings, facts, ids: [finding.id] });
-  assert.equal(task.title, 'Review the size of a/huge.mjs');
-  assert.match(task.acceptance[0], /^The file is shorter than 1500 lines .*or the concentration is confirmed as intended and accepted with that reason\.$/);
-  assert.deepEqual(task.facts[0].evidence, { reasons: ['file'], loc: 1600, module: 'a', threshold: { fileLines: 1500 } });
-  assert.deepEqual(schemaErrors('ai-task', task), []);
 });

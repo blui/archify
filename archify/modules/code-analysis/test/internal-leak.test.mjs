@@ -5,7 +5,6 @@ import { test } from 'node:test';
 import { evaluate } from '../evaluate/index.mjs';
 import { DiagnosticError } from '../extract/shared/diagnostics.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
-import { buildTask } from '../lib/task.mjs';
 
 const CODE = 'coupling/internal-leak';
 
@@ -100,8 +99,6 @@ test('internal-leak: configured entries make bypassing imports a warning and rep
   assert.equal(f.evidence.entrySource, 'config');
   assert.deepEqual(f.evidence.entries, ['src/lib/api.ts']);
   assert.deepEqual(f.evidence.internalFiles, ['src/lib/index.ts'], 'a configured convention replaces the index.* default');
-  const task = buildTask({ findings: evaluate(graph, config, facts), facts, ids: [f.id] });
-  assert.match(task.title, /one entry point/);
 });
 
 test('internal-leak: test files, vendored folders and Java are not checked', () => {
