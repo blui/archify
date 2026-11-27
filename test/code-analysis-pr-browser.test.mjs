@@ -40,7 +40,7 @@ test('native PR view keeps comparison chart visible and shares localized source/
     const out=path.join(dir,locale),source={root:'.',sourceKind:'git-tree',baseRevision:baseSHA,revision:baseSHA};
     analyzeRepository({root:roots.base,out:path.join(out,'base'),locale,source,language:'ts'});
     const result=analyzeRepository({root:roots.head,out,locale,language:'ts',source:{...source,revision:headSHA},previous:path.join(out,'base/findings.json'),
-      pullRequest:{pr:{number:null,simulation:true,title:'</script><script>window.prInjected=1</script>',repository:'example/project',mergeBaseSHA:baseSHA,headSHA,baseSHA,capturedAt:'2026-11-14T05:02:16Z'},scope:'.',changedFiles:[{path:'main.mjs',status:'modified'},{path:'removed.mjs',status:'removed'}],manifests:{base:{skipped:[]},head:{skipped:[]}},sourceRoot:roots.head}});
+      pullRequest:{pr:{number:null,title:'</script><script>window.prInjected=1</script>',repository:'example/project',mergeBaseSHA:baseSHA,headSHA,baseSHA,capturedAt:'2026-11-14T05:02:16Z'},scope:'.',changedFiles:[{path:'main.mjs',status:'modified'},{path:'removed.mjs',status:'removed'}],manifests:{base:{skipped:[]},head:{skipped:[]}},sourceRoot:roots.head}});
     const loaded=browser.cdp.waitFor('Page.loadEventFired',session);await send('Page.navigate',{url:pathToFileURL(result.overlay.html).href});await loaded;
     await run("document.fonts.ready.then(()=>new Promise(r=>setTimeout(r,200)))");
     const marks=await run(`(()=>{const d=JSON.parse(document.getElementById('bauify-analysis').textContent),change=d.pullRequest.changes.find(c=>c.path==='main.mjs'&&c.kind==='file');return {module:d.pullRequest.moduleChanges.find(m=>m.id===change.module),texts:window.__atlasTexts,glyphs:Object.keys(window.__atlasGlyphs)};})()`);
@@ -103,7 +103,7 @@ test('native PR view keeps comparison chart visible and shares localized source/
   fs.writeFileSync(report,JSON.stringify([{filePath:'main.mjs',messages:[{ruleId:'example-rule',severity:1,message:'Review this source',line:1,column:1}]}]));
   fs.writeFileSync(config,JSON.stringify({external:{sources:[{id:'external-ui',format:'eslint',file:report}]}}));
   const out=path.join(dir,'en');
-  const imported=analyzeRepository({root:roots.head,out,locale:'en',language:'ts',config,source:{root:'.',sourceKind:'git-tree',baseRevision:baseSHA,revision:headSHA},previous:path.join(out,'base/findings.json'),pullRequest:{pr:{number:null,simulation:true,title:'External attribution',repository:'example/project',mergeBaseSHA:baseSHA,headSHA,baseSHA},scope:'.',changedFiles:[{path:'main.mjs',status:'modified'}],manifests:{base:{skipped:[]},head:{skipped:[]}},sourceRoot:roots.head}});
+  const imported=analyzeRepository({root:roots.head,out,locale:'en',language:'ts',config,source:{root:'.',sourceKind:'git-tree',baseRevision:baseSHA,revision:headSHA},previous:path.join(out,'base/findings.json'),pullRequest:{pr:{number:null,title:'External attribution',repository:'example/project',mergeBaseSHA:baseSHA,headSHA,baseSHA},scope:'.',changedFiles:[{path:'main.mjs',status:'modified'}],manifests:{base:{skipped:[]},head:{skipped:[]}},sourceRoot:roots.head}});
   const importedLoaded=browser.cdp.waitFor('Page.loadEventFired',session);await send('Page.navigate',{url:pathToFileURL(imported.overlay.html).href});await importedLoaded;
   const attribution=await run(`(()=>{let d=JSON.parse(document.getElementById('bauify-analysis').textContent);return {comparable:d.overview.review.comparison.comparable,origins:[...document.querySelectorAll('[data-assessment] .pr-origin')].map(e=>e.textContent),review:document.querySelector('.pr-review').textContent,external:!!document.querySelector('.external-entry'),ai:!!document.querySelector('.pr-ai-status')};})()`);
   assert.equal(attribution.comparable,false);assert.deepEqual(attribution.origins,['Automatic detection','Automatic detection']);assert.doesNotMatch(attribution.review,/ESLint|Review this source/);assert.equal(attribution.external,true);assert.equal(attribution.ai,false);
@@ -162,7 +162,7 @@ async function checkPinnedFiles(t, diagram) {
     }
     const result = analyzeRepository({
       ...authored, root: head, out, language: 'ts', source: { ...source, revision: headSHA }, previous: path.join(previous, 'findings.json'),
-      pullRequest: { pr: { simulation: true, title: 'File review', repository: 'example/project', mergeBaseSHA: baseSHA, headSHA, baseSHA },
+      pullRequest: { pr: { title: 'File review', repository: 'example/project', mergeBaseSHA: baseSHA, headSHA, baseSHA },
         scope: 'packages/widget', changedFiles: [{ path: 'new.ts', previousPath: 'old.ts', status: 'renamed' },
           { path: 'gone.ts', status: 'removed' }, { path: 'README.md', status: 'modified' }],
         manifests: { base: { skipped: [] }, head: { skipped: [] } }, sourceRoot: head, baseSourceRoot: base },

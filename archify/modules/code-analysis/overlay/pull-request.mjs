@@ -87,7 +87,7 @@ export function buildPullRequestView({ pr, scope, changedFiles, manifests, sourc
   }));
   const view = {
     number: pr.number, title: pr.title, url: pr.url, repository: pr.repository, scope,
-    ...(pr.local ? { local: true, componentDrift, headSources } : {}), simulation: pr.simulation === true, baseSHA: pr.mergeBaseSHA, headSHA: pr.headSHA, targetBaseSHA: pr.baseSHA,
+    ...(pr.local ? { local: true, componentDrift, headSources } : {}), baseSHA: pr.mergeBaseSHA, headSHA: pr.headSHA, targetBaseSHA: pr.baseSHA,
     capturedAt: pr.capturedAt, sourceRoot, baseSourceRoot, sourceGitRoot, changedFiles, impact,
     before: count(before), after: count(after),
     distribution: { labels: ['1', '2–4', '5–9', '10–14', '15–24', '25+'], before: histogram(before), after: histogram(after) },

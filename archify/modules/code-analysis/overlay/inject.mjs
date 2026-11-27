@@ -123,7 +123,7 @@ export function alignDiagram({ ir, graph, map = null, facts = null, findings = [
 export function buildOverlay({ ir, graph, html, map, facts = null, findings = [], findingsDocument = null, sourceRoot = null, run = {} }) {
   const pr = run.pullRequest;
   const tr = createTranslator(messagesFor(run.locale));
-  if (!ir) html = standaloneShell({ locale: run.locale, title: pr ? pr.repository + ' · ' + (pr.local ? tr('Pinned local review') : pr.simulation ? tr('PR analysis · local simulation') : '#' + pr.number) : path.basename(sourceRoot || graph.repository.root || 'Repository') });
+  if (!ir) html = standaloneShell({ locale: run.locale, title: pr ? pr.repository + ' · ' + tr('Pinned local review') : path.basename(sourceRoot || graph.repository.root || 'Repository') });
   if (ir && (!html.includes('data-node-id=') || !html.includes('class="toolbar"'))) {
     fail('overlay/not-archify-html', 'The HTML does not look like an Archify architecture artifact.', {
       evidence: { hasNodes: html.includes('data-node-id='), hasToolbar: html.includes('class="toolbar"') },

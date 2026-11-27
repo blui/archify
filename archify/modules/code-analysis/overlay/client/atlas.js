@@ -689,7 +689,7 @@
       var change = changedFiles[changedSelection];
       return '<div class="selected"><h4>' + esc(changedLabel(change)) + '</h4><p>' + esc(tr(change.status)) +
         '</p><div class="atlas-change-actions">' + ['base', 'head'].map(function (snapshot) {
-          var label = tr(pr.local ? (snapshot === 'base' ? 'Open pinned base source' : 'Open pinned head source') : (snapshot === 'base' ? 'Open merge-base source' : 'Open PR head source'));
+          var label = tr(snapshot === 'base' ? 'Open pinned base source' : 'Open pinned head source');
           return '<button type="button" data-atlas-change-source="' + snapshot + '"' +
             (changedSource(change, snapshot) ? '' : ' disabled') + '>' + esc(label) + '</button>';
         }).join('') + '<button type="button" class="atlas-change-download">' + esc(tr('Download .md')) + '</button></div></div>';
@@ -717,15 +717,15 @@
     return '<div class="note">' + tr("Hover the circle for names. Click a module arc to focus it, a dotted spike or a finding below to light it up.") + '</div>';
   }
   function prSummary() {
-    var h = '<section class="pr-summary"><div class="k">' + esc(pr.local ? tr('Pinned local review') : pr.simulation ? tr('PR analysis · local simulation') : tr('PR #{number}', {number:pr.number})) + '</div>';
+    var h = '<section class="pr-summary"><div class="k">' + esc(tr('Pinned local review')) + '</div>';
     h += '<p class="note"><code>' + esc(pr.baseSHA.slice(0,8)) + ' → ' + esc(pr.headSHA.slice(0,8)) + '</code> · ' + esc(pr.scope) + '</p><dl class="pr-totals">';
     [['files','files'],['dependencies','file dependencies'],['functions','functions'],['modules','modules']].forEach(function(item) {
       h += '<div><dt>' + esc(tr(item[1])) + '</dt><dd>' + fmt(pr.before[item[0]]) + ' → <b>' + fmt(pr.after[item[0]]) + '</b></dd></div>';
     });
-    h += '</dl><div class="k">' + esc(tr('Complexity distribution · function counts')) + '</div><p class="note">' + esc(tr(pr.local ? 'Grey: pinned base · green: pinned head' : 'Grey: merge-base · green: PR head')) + '</p><div class="pr-distribution" role="img" aria-label="' + esc(tr('Complexity distribution · function counts')) + '">';
+    h += '</dl><div class="k">' + esc(tr('Complexity distribution · function counts')) + '</div><p class="note">' + esc(tr('Grey: pinned base · green: pinned head')) + '</p><div class="pr-distribution" role="img" aria-label="' + esc(tr('Complexity distribution · function counts')) + '">';
     var d=pr.distribution, max=Math.max.apply(Math,d.before.concat(d.after,1));
     d.labels.forEach(function(label,i) { h += '<div class="pr-band"><span>' + esc(label) + '</span><span class="pr-tracks"><i style="width:' + 100*d.before[i]/max + '%"></i><b style="width:' + 100*d.after[i]/max + '%"></b></span><span>' + d.before[i] + ' → ' + d.after[i] + '</span></div>'; });
-    h += '</div><p class="note">' + esc(tr('Green +: added · amber ◇: changed · red dashed curve: removed dependency. Removed objects remain in the change list.')) + '</p><p class="note">' + esc(tr('Grey dashed spikes: merge-base complexity · red −: removed function. Click a marker for source; hover a module for counts.')) + '</p>';
+    h += '</div><p class="note">' + esc(tr('Green +: added · amber ◇: changed · red dashed curve: removed dependency. Removed objects remain in the change list.')) + '</p><p class="note">' + esc(tr('Grey dashed spikes: pinned base complexity · red −: removed function. Click a marker for source; hover a module for counts.')) + '</p>';
     h += '<details class="pr-changes"><summary>' + esc(tr('PR changes · {count}',{count:pr.changes.length})) + '</summary>';
     pr.changes.forEach(function(change,i) {
       var label=change.kind==='edge'?change.from+' → '+change.to:change.kind==='function'?change.name+'() · '+change.path:change.path;
@@ -817,7 +817,7 @@
           tr('Repository: ') + literal(pr.repository) + '\n' + tr('Status: ') + literal(change.status) + '\n\n' +
           ['base', 'head'].map(function (side) {
             var pin = side === 'base' ? pr.baseSHA : pr.headSHA;
-            return '- ' + tr(pr.local ? (side === 'base' ? 'Pinned base' : 'Pinned head') : (side === 'base' ? 'Merge-base' : 'PR head')) + ' ' + pin + ' · ' +
+            return '- ' + tr(side === 'base' ? 'Pinned base' : 'Pinned head') + ' ' + pin + ' · ' +
               (pair[side] ? literal(prefix + pair[side]) + (changedSource(change, side) ? '' : ' (' + tr('Source was not captured') + ')') : tr('File absent on this side'));
           }).join('\n') + '\n\n' + tr('This context identifies the saved file and commits. Verify the cited source before drawing conclusions.') + '\n';
         downloadMarkdown(markdown, 'pr-file-review.md');
@@ -985,7 +985,7 @@
   }
   function renderPage() {
     var mode = state.finding !== -1 ? 'finding' : state.file !== -1 ? 'file' : state.focusModule !== -1 ? 'module' : homeOpen ? 'home' : 'closed';
-    // A PR changed file picked in the Files tab leads its page with the merge-base / PR head source actions.
+    // A changed file picked in the Files tab leads its page with the pinned base / head source actions.
     var change = changedSelection !== null && mode !== 'finding' ? selectedCard() : '';
     if (change && mode !== 'file') mode = 'change';
     panel.setAttribute('data-fly', mode);

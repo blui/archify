@@ -497,10 +497,10 @@
     var h = ("<div class=\"grip\">" + "<button class=\"close\" aria-label=\"" + tr("Close") + "\">" + "×" + "</button>" + "<button type=\"button\" class=\"source-back back\">" + "← ") + sourceParent + ("</button>" + "<div class=\"k\">" + tr("Source · ")) + (line ? tr("line ") + line : (full ? tr("full file") : tr("file preview")) + tr(" · no specific finding line")) + '</div><h3>' + esc(file) + '</h3></div>';
     if (pr) h += '<div class="pr-source-sides">' +
       '<button type="button" data-pr-side="base" aria-pressed="' + (snapshot === 'base') + '"' +
-      (!captured(pr.beforeSources, before) ? ' disabled' : '') + '>' + esc(tr(pr.local ? 'Pinned base' : 'Merge-base')) + ' ' + esc(pr.baseSHA.slice(0, 8)) + '</button>' +
+      (!captured(pr.beforeSources, before) ? ' disabled' : '') + '>' + esc(tr('Pinned base')) + ' ' + esc(pr.baseSHA.slice(0, 8)) + '</button>' +
       '<button type="button" data-pr-side="head" aria-pressed="' + (snapshot !== 'base') + '"' +
-      (!captured(data.snippets, after) ? ' disabled' : '') + '>' + esc(tr(pr.local ? 'Pinned head' : 'PR head')) + ' ' + esc(pr.headSHA.slice(0, 8)) + '</button>' +
-      '<span>' + esc(tr(pr.local ? (snapshot === 'base' ? 'Showing pinned base source' : 'Showing pinned head source') : (snapshot === 'base' ? 'Showing merge-base source' : 'Showing PR head source'))) + '</span>' +
+      (!captured(data.snippets, after) ? ' disabled' : '') + '>' + esc(tr('Pinned head')) + ' ' + esc(pr.headSHA.slice(0, 8)) + '</button>' +
+      '<span>' + esc(tr(snapshot === 'base' ? 'Showing pinned base source' : 'Showing pinned head source')) + '</span>' +
       (sourcePair ? '<code class="pr-source-pin">' + esc(snapshot === 'base' ? pr.baseSHA : pr.headSHA) + '</code>' : '') + '</div>';
     if (why) h += '<div class="why">' + esc(why) + '</div>';
     if (!snip) {
@@ -510,7 +510,7 @@
       var added = new Set(changes ? changes.added : []), modified = new Set(changes ? changes.modified : []);
       var deleted = new Map((changes ? changes.deleted : []).map(function (item) { return [item.after, item.count]; }));
       if (changes && changes.status !== 'unavailable') {
-        h += '<div class="diff-legend">' + (data.pullRequest ? esc(tr(data.pullRequest.local ? 'Captured changes vs pinned base {sha}' : 'Captured PR changes vs merge-base {sha}', { sha: data.pullRequest.baseSHA.slice(0,8) })) : tr('Captured changes vs base commit ') + esc((data.repository && data.repository.baseRevision || '').slice(0,7)) + tr(' (staged + unstaged)'));
+        h += '<div class="diff-legend">' + (data.pullRequest ? esc(tr('Captured changes vs pinned base {sha}', { sha: data.pullRequest.baseSHA.slice(0,8) })) : tr('Captured changes vs base commit ') + esc((data.repository && data.repository.baseRevision || '').slice(0,7)) + tr(' (staged + unstaged)'));
         if (changes.status === 'unchanged') h += tr(" · No changes");
         else h += (" · " + "<span class=\"added\">" + tr("+ Added") + "</span>" + " · " + "<span class=\"modified\">" + tr("~ Modified") + "</span>" + " · " + "<span class=\"deleted\">" + tr("− Deleted") + "</span>");
         if (changes.status === 'added') h += tr(" · New file");
@@ -803,7 +803,7 @@
       var gone = c.notDetected || c.fixed || [];
       var comparable = c.comparable === true;
       var title = comparable ? gone.length || c.new.length ? tr('{gone} no longer detected · {added} new', { gone: gone.length, added: c.new.length }) : tr('No detected changes') : tr('Not directly comparable');
-      h += '<section class="comparison-banner ' + (comparable && !c.new.length && gone.length ? 'positive' : '') + '" role="status" aria-live="polite"><span>' + esc(tr(data.pullRequest ? (data.pullRequest.local ? 'Compared with pinned base' : 'Compared with PR merge-base') : 'Compared with previous analysis')) + '</span><b>' + esc(title) + '</b>';
+      h += '<section class="comparison-banner ' + (comparable && !c.new.length && gone.length ? 'positive' : '') + '" role="status" aria-live="polite"><span>' + esc(tr(data.pullRequest ? 'Compared with pinned base' : 'Compared with previous analysis')) + '</span><b>' + esc(title) + '</b>';
       if (c.evidenceChanged.length) h += '<span>' + esc(tr('{changed} with changed evidence', { changed: c.evidenceChanged.length })) + '</span>';
       h += '<p>' + esc(comparable ? tr('No longer detected does not prove a fix; verify source changes and project tests.') : c.comparable === false ? tr('Configuration, grouping, model or coverage changed. Missing findings do not establish a fix.') : tr('Comparison context is unavailable. Missing findings do not establish a fix.')) + '</p>';
       if(data.pullRequest) h += '<p>' + esc(tr('This compares rule reports. Changed evidence is not a finding of increased risk; PR-attributed effects are below.')) + '</p>';
@@ -880,11 +880,11 @@
     if(record.kind!=='known-users'&&record.callers&&record.callers.coverage!=='available') h+='<p class="pr-assessment-scope">'+esc(tr('Callsite coverage unavailable'))+'</p>';
     var primary=record.locations.findIndex(function(loc){return loc.side==='head';});if(primary<0)primary=0;
     var at=record.locations[primary];
-    if(at)h+='<button type="button" class="text-action pr-impact-path" data-impact-location="'+index+':'+primary+'">'+esc(at.file+':'+at.line)+' · '+esc(tr(data.pullRequest.local ? (at.side === 'base' ? 'Pinned base' : 'Pinned head') : (at.side === 'base' ? 'Merge-base' : 'PR head')))+'</button>';
+    if(at)h+='<button type="button" class="text-action pr-impact-path" data-impact-location="'+index+':'+primary+'">'+esc(at.file+':'+at.line)+' · '+esc(tr(at.side === 'base' ? 'Pinned base' : 'Pinned head'))+'</button>';
     h+='<details class="pr-impact-evidence"><summary>'+esc(tr('Change evidence and affected references'))+'</summary>';
     if(record.kind==='dependency-changed') h+='<pre class="pr-impact-forms">'+esc(JSON.stringify({base:record.before.forms,head:record.after.forms},null,2))+'</pre>';
     if(record.kind==='structural-measures') h+='<p class="pr-assessment-scope">'+esc(tr('These are existing rule measurements from both snapshots; the cause of an individual edge is not established.'))+'</p>';
-    record.locations.forEach(function(loc,i){h+='<button type="button" class="text-action" data-impact-location="'+index+':'+i+'">'+esc(tr(data.pullRequest.local ? (loc.side === 'base' ? 'Pinned base' : 'Pinned head') : (loc.side === 'base' ? 'Merge-base' : 'PR head')))+' · '+esc(loc.file+':'+loc.line)+(loc.relation?' · '+esc(tr(loc.relation==='bound-call'?'Bound source call':'File import')):'')+(loc.unchanged?' · '+esc(tr('unchanged file')):'')+'</button>';});
+    record.locations.forEach(function(loc,i){h+='<button type="button" class="text-action" data-impact-location="'+index+':'+i+'">'+esc(tr(loc.side === 'base' ? 'Pinned base' : 'Pinned head'))+' · '+esc(loc.file+':'+loc.line)+(loc.relation?' · '+esc(tr(loc.relation==='bound-call'?'Bound source call':'File import')):'')+(loc.unchanged?' · '+esc(tr('unchanged file')):'')+'</button>';});
     (record.contexts||[]).forEach(function(context){h+='<p class="pr-assessment-scope">'+esc(tr('Related existing constraint'))+' · <button type="button" class="text-action" data-finding="'+esc(context.id)+'">'+esc(GROUPS[context.code]||context.code)+'</button></p>';});
     h+='</details>';
     if(finding)h+=quickHandoff(finding,true)+taskHtml(finding);
@@ -910,7 +910,7 @@
       (live ? iconButton('refresh', tr('Re-analyze'), ' bauify-reanalyze') : '<span class="snapshot-label" tabindex="0" role="img" aria-label="' + esc(tr('Offline snapshot')) + '" data-analysis-tip="' + esc(tr('Offline snapshot')) + '">' + uiIcon('snapshot') + '</span>') + '</div>';
     if (data.pullRequest) {
       var pr = data.pullRequest;
-      h += '<p class="pr-context"><b>' + esc(pr.local ? tr('Pinned local review') : pr.simulation ? tr('PR analysis · local simulation') : tr('PR #{number}', { number: pr.number })) + '</b> · ' + esc(pr.title) + '</p><p class="ev">' + esc(pr.scope) + ' · <code>' + esc(pr.baseSHA.slice(0,8)) + ' → ' + esc(pr.headSHA.slice(0,8)) + '</code></p><p class="ev">' + esc(tr('The atlas shows PR head. Existing findings are not automatically caused by this PR.')) + '</p>';
+      h += '<p class="pr-context"><b>' + esc(tr('Pinned local review')) + '</b> · ' + esc(pr.title) + '</p><p class="ev">' + esc(pr.scope) + ' · <code>' + esc(pr.baseSHA.slice(0,8)) + ' → ' + esc(pr.headSHA.slice(0,8)) + '</code></p><p class="ev">' + esc(tr('The atlas shows PR head. Existing findings are not automatically caused by this PR.')) + '</p>';
       if (pr.local) h += '<details class="pr-pins"><summary>' + esc(tr('Review commits')) + '</summary><p class="ev">' +
         esc(tr('Pinned base')) + ' <code>' + esc(pr.baseSHA) + '</code><br>' + esc(tr('Pinned head')) + ' <code>' + esc(pr.headSHA) +
         '</code></p></details><button type="button" class="pr-review-download">' + esc(tr('Download review .md')) + '</button>';
@@ -968,7 +968,7 @@
     if (!standalone) h += '<details><summary>' + esc(tr('Colour key')) + '</summary>' + legend() + '</details>';
     h += '</div>';
     overview.innerHTML = h;
-    overview.querySelectorAll('[data-impact-location]').forEach(function(button){button.addEventListener('click',function(){var indices=button.getAttribute('data-impact-location').split(':').map(Number),loc=data.pullRequest.impact.records[indices[0]].locations[indices[1]];showCode(loc.file,loc.line,tr(data.pullRequest.local ? 'Captured source from the pinned commits.' : 'Captured PR source; inspect changes against the merge-base.'),'info',false,null,null,null,loc.side);});});
+    overview.querySelectorAll('[data-impact-location]').forEach(function(button){button.addEventListener('click',function(){var indices=button.getAttribute('data-impact-location').split(':').map(Number),loc=data.pullRequest.impact.records[indices[0]].locations[indices[1]];showCode(loc.file,loc.line,tr('Captured source from the pinned commits.'),'info',false,null,null,null,loc.side);});});
     var downloadReview = overview.querySelector('.pr-review-download');
     if (downloadReview) downloadReview.addEventListener('click', function () {
       var pr = data.pullRequest;
@@ -1750,7 +1750,7 @@
   // The Atlas view hands a finding back here to show its source evidence.
   window.__archifyShowSource = function (file, line, snapshot, sourcePair, returnFocus) {
     setOn(true);
-    showCode(file, line, tr(data.pullRequest?.local ? 'Captured source from the pinned commits.' : 'Captured PR source; inspect changes against the merge-base.'), 'info', false, null, null, null, snapshot, sourcePair, returnFocus);
+    showCode(file, line, tr('Captured source from the pinned commits.'), 'info', false, null, null, null, snapshot, sourcePair, returnFocus);
   };
   window.__archifyShowFinding = function (id, parent) {
     if (!findingById[id]) return;
