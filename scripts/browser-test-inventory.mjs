@@ -49,7 +49,6 @@ export const browserTestFiles = [
   'sequence-segment-contrast-browser.test.mjs',
   'toolbar-keyboard-browser.test.mjs',
   'bottom-node-index-browser.test.mjs',
-  'explainer-browser.test.mjs',
   'code-analysis-browser.test.mjs',
   'code-analysis-boundary-browser.test.mjs',
   'code-analysis-drift-browser.test.mjs',
@@ -59,8 +58,8 @@ export const browserTestFiles = [
   'code-analysis-workbench-browser.test.mjs',
   'code-analysis-standalone-browser.test.mjs',
   'code-analysis-pr-browser.test.mjs',
-  'packaged-examples-browser.test.mjs',
   'export-svg-delivery.test.mjs',
+  'packaged-examples-browser.test.mjs',
   // Benchmark observers and real export integration require this explicit Chrome lane.
   'node-index-route-browser.test.mjs',
 ];

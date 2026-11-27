@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
-import { isExplainerHtml, checkExplainerHtml } from '../explainer/check.mjs';
 import { analyzeSvgPath } from '../renderers/shared/svg-path-analysis.mjs';
 import { drawnPathRectClearance, prepareCrossingPath, visibleCrossings } from '../renderers/shared/route-crossings.mjs';
 import { arrowheadTriangle, maskCoversArrowhead } from '../renderers/shared/arrowhead.mjs';
@@ -51,16 +50,6 @@ try {
     checks: [{ name: 'file_readable', ok: false, details: [err.message] }],
   }, null, 2));
   process.exit(1);
-}
-
-if (isExplainerHtml(html)) {
-  const result = checkExplainerHtml(html, { file: htmlPath });
-  // Piped stdout is asynchronous on macOS. Exit only after the full receipt
-  // has flushed, and keep the diagram path below from emitting a second one.
-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`, () => {
-    process.exit(result.ok ? 0 : 1);
-  });
-  await new Promise(() => {});
 }
 
 const checks = [];

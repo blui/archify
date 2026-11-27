@@ -293,7 +293,7 @@ test('export-svg rejects bad arguments and renderer failures with structured rec
   assert.equal(themeReceipt.stage, 'arguments');
   assert.equal(themeReceipt.diagnostics[0].code, 'cli/unsupported-option');
 
-  const badType = spawnSync(process.execPath, [cli, 'export-svg', 'explainer', input, path.join(scratch, 'x'), '--json'], { encoding: 'utf8' });
+  const badType = spawnSync(process.execPath, [cli, 'export-svg', 'unknown-type', input, path.join(scratch, 'x'), '--json'], { encoding: 'utf8' });
   assert.equal(badType.status, 2);
   assert.equal(JSON.parse(badType.stdout).diagnostics[0].code, 'cli/unknown-diagram-type');
 

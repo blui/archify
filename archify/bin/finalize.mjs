@@ -17,7 +17,6 @@ import {
   persistBrowserCheckFailure,
   VISUAL_CHECK_VIEWPORTS,
 } from './visual-check.mjs';
-import { declaredExplainerInputPaths } from '../explainer/prepare.mjs';
 
 export const FINALIZE_STAGES = Object.freeze(['validate', 'deliver', 'check', 'browser-check']);
 
@@ -149,17 +148,6 @@ function exactViewportCoverage(entries, viewports, predicate) {
 }
 
 function validBrowserEvidence(receipt) {
-  if (receipt.family === 'explainer') {
-    const viewports = [1280, 1440].flatMap(width => ['light', 'dark'].map(theme => ({ width, height: 900, theme })));
-    const groups = ['containment', 'readability', 'viewerChrome', 'themeStates'];
-    return receipt.viewportPolicy === 'explainer-desktop-v1'
-      && groups.every(group => receipt[group]?.status === 'pass'
-        && exactViewportCoverage(receipt[group].viewports?.map(entry => ({ ...entry, requestedTheme: entry.requestedTheme || entry.theme })), viewports, (entry, expected) =>
-          entry.ok === true && (entry.requestedTheme || entry.theme) === expected.theme))
-      && ['commonQa', 'interactions', 'references', 'noJavaScript', 'print'].every(group =>
-        receipt[group]?.status === 'pass' && Array.isArray(receipt[group].observations) && receipt[group].observations.length > 0
-        && receipt[group].observations.every(entry => entry.ok === true));
-  }
   return exactViewportCoverage(receipt.containment?.viewports, VISUAL_CHECK_VIEWPORTS, (entry) => (
     entry.theme === 'light' && entry.ok === true
   ))
@@ -305,10 +293,6 @@ function stageBindingDiagnostic({ stage, receipt, expectedArtifact, expectedRece
       });
     }
     return null;
-  }
-  if (stage === 'browser-check' && ((type === 'explainer') !== (receipt.family === 'explainer'))) {
-    return { code: 'finalize/browser-family-mismatch', severity: 'error', message: 'Browser evidence covers a different artifact family.',
-      subject: {stage, artifact: output}, evidence: {expectedType:type, actualFamily:receipt.family}, supportedFixes:['Rerun browser-check for the delivered artifact.'] };
   }
   if (stage === 'check' && deliveryValidation?.checkCount !== receipt.checks.length) {
     return {
@@ -515,9 +499,9 @@ function defaultRunner({ cliPath, args, cwd, env }) {
   });
 }
 
-function stageArguments({ stage, type, input, output, quality, repoRoot, outDir, writingMode }) {
+function stageArguments({ stage, type, input, output, quality, repoRoot, outDir }) {
   const qualityArgs = ['--quality', quality];
-  const repoArgs = [...(repoRoot ? ['--repo-root', repoRoot] : []), ...(type==='explainer' && writingMode ? ['--writing',writingMode] : [])];
+  const repoArgs = repoRoot ? ['--repo-root', repoRoot] : [];
   if (stage === 'validate') return ['validate', type, input, ...qualityArgs, ...repoArgs, '--json'];
   if (stage === 'deliver') return ['deliver', type, input, output, ...qualityArgs, ...repoArgs, '--json'];
   if (stage === 'check') return ['check', output, '--require-provenance'];
@@ -900,10 +884,7 @@ export async function runFinalize({
   output,
   quality = 'showcase',
   repoRoot,
-  writingMode,
   candidateSha256,
-  preparedExplainer,
-  browserCheck = false,
   outDir,
   receiptPath,
   deliveryPaths = defaultDeliveryPaths,
@@ -917,13 +898,10 @@ export async function runFinalize({
   createBrowser = (chromePath, options) => new ChromeVisualBrowser(chromePath, options),
 } = {}) {
   if (!cliPath || !type || !input || !output) throw new Error('finalize requires cliPath, type, input, and output.');
-  const needsBrowser = type !== 'explainer' || browserCheck;
   const started = process.hrtime.bigint();
   const startedAt = new Date().toISOString();
   const resolvedInput = path.resolve(input);
-  const inputPaths = type === 'explainer'
-    ? declaredExplainerInputPaths(fs.readFileSync(resolvedInput, 'utf8'), resolvedInput)
-    : [resolvedInput];
+  const inputPaths = [resolvedInput];
   const resolvedOutput = resolveOutputPath({ requestedOutput: output, inputPaths }).outputPath;
   const resolvedOutDir = outDir === undefined ? undefined : resolveNativeOutputDirectory(outDir);
   let specification = identity(resolvedInput);
@@ -950,13 +928,6 @@ export async function runFinalize({
     requestedOutput: defaultFinalizeSummaryPath(resolvedReceipt), inputPaths, requiredExtension: '.json',
   }).outputPath;
   const assertReceiptPaths = () => {
-    if (type === 'explainer') {
-      const publications = Object.values(deliveryPaths(resolvedOutput));
-      if (needsBrowser) publications.push(browserCheckSidecarPaths(resolvedOutput, { outDir: resolvedOutDir }).receipt);
-      for (const target of publications) {
-        resolveOutputPath({ requestedOutput: target, inputPaths, requiredExtension: '.json', inputDescription: 'an Explainer input' });
-      }
-    }
     const reserved = reservedFinalizePaths({ input: resolvedInput, output: resolvedOutput, outDir: resolvedOutDir, deliveryPaths, inputPaths });
     const receiptCollision = reserved.find((file) => pathsAlias(resolvedReceipt, file));
     if (receiptCollision) throw new Error(`The finalize receipt must be distinct from the specification, artifact, and gate sidecars: "${receiptCollision}".`);
@@ -978,18 +949,13 @@ export async function runFinalize({
     startedAt,
     specification,
     artifact: { path: resolvedOutput },
-    stages: needsBrowser ? {} : {'browser-check':{status:'not-run',execution:'not-requested'}},
-    browserCheck: {requested:needsBrowser,ran:false},
+    stages: {},
+    browserCheck: {requested:true,ran:false},
     diagnostics: [],
     evidence: { receipt: resolvedReceipt, summaryReceipt: resolvedSummary },
     visualReview: 'not-requested',
   };
   const persistReceipts = () => {
-    if (type === 'explainer') receipt.diagnostics = (receipt.diagnostics || []).map(entry => {
-      const location=preparedExplainer?.sourceMap?.[entry.subject?.path] || {};
-      return {...entry,subject:{input:resolvedInput,line:location.line || 1,component:'document',...(entry.subject || {})},
-        evidence:{reason:entry.code,example:entry.supportedFixes?.[0] || 'Repair the named original draft component and rerun finalize.',...(entry.evidence || {})}};
-    });
     assertReceiptPaths();
     for (const [file, capture] of [[resolvedReceipt, receiptCapture], [resolvedSummary, summaryCapture]]) {
       const current = verifyAtomicOutput(capture.snapshot);
@@ -1028,7 +994,7 @@ export async function runFinalize({
   try {
     let exitCode = 0;
     for (let attempt = 0; attempt < 2; attempt++) {
-      for (const stage of (needsBrowser ? ['deliver', 'check', 'browser-check'] : ['deliver','check'])) {
+      for (const stage of ['deliver', 'check', 'browser-check']) {
         const stageStarted = process.hrtime.bigint();
         const args = stageArguments({
           stage,
@@ -1037,22 +1003,11 @@ export async function runFinalize({
           output: resolvedOutput,
           quality,
           repoRoot,
-          writingMode,
           outDir: resolvedOutDir,
         });
         const inProcess = stage === 'browser-check' && runBrowserCheck;
         let result;
-        if (preparedExplainer) {
-          try {
-            const { assertPreparedDependencies } = await import('../explainer/prepare.mjs');
-            assertPreparedDependencies(preparedExplainer);
-          } catch (error) {
-            result = { status: 1, stdout: JSON.stringify({ok:false,status:'fail',command:stage,stage:'prepare',diagnostics:error.archifyDiagnostics || []}) };
-          }
-        }
-        if (result) {
-          // The original resources changed between gates; do not run another gate on them.
-        } else if (inProcess) {
+        if (inProcess) {
           try {
             chromePath = resolveChrome({ env });
             if (chromePath) {
@@ -1090,14 +1045,6 @@ export async function runFinalize({
         } else {
           result = await runCommand({ stage, cliPath, args, cwd,
             env });
-        }
-        if (preparedExplainer && result.status === 0) {
-          try {
-            const { assertPreparedDependencies } = await import('../explainer/prepare.mjs');
-            assertPreparedDependencies(preparedExplainer);
-          } catch (error) {
-            result = { status: 1, stdout: JSON.stringify({ok:false,status:'fail',command:stage,stage:'prepare',diagnostics:error.archifyDiagnostics || []}) };
-          }
         }
         const stageReceipt = parsedReceipt(result.stdout);
         if (stage === 'browser-check') receipt.browserCheck.ran = Boolean(stageReceipt?.containment?.viewports?.length);
@@ -1206,8 +1153,7 @@ export async function runFinalize({
         repair = repairSourceRanges(resolvedInput, receipt.diagnostics, specification, specificationCapture);
         if (repair) {
           specification = { path: resolvedInput, sha256: sha256(repair.capture.bytes), bytes: repair.capture.bytes.byteLength };
-          Object.assign(receipt, { status: 'running', specification, stages: needsBrowser ? {} : {
-            'browser-check': { status: 'not-run', execution: 'not-requested' } },
+          Object.assign(receipt, { status: 'running', specification, stages: {},
             diagnostics: [], artifact: { path: resolvedOutput }, autoRepair: { ...repair.record, outcome: 'retrying' } });
           delete receipt.failedStage;
           exitCode = 0;
@@ -1266,7 +1212,7 @@ export async function runFinalize({
       if (receipt.ok) receipt.autoRepair = { ...repair.record, outcome: 'applied' };
       else restoreRepair();
     }
-    if (receipt.ok && repoRoot && type !== 'explainer') {
+    if (receipt.ok && repoRoot) {
       const source = receipt.stages.deliver.receipt.evidence;
       receipt.repositoryReferences = source?.verified
         ? { status: 'verified', revision: source.revision, count: source.references }

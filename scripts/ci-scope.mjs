@@ -17,8 +17,6 @@ const browserGateTest = 'test/browser-gate.test.mjs';
 const viewerTemplate = 'archify/assets/template.html';
 const atlasBrowserTest = name => name.startsWith('test/code-analysis-') && maintainedBrowserTests.has(name);
 const sharedSvgBaker = 'archify/renderers/shared/svg-bake.mjs';
-const explainerBrowserTest = 'test/explainer-browser.test.mjs';
-const explainerPresentation = /^archify\/explainer\/(?:browser-check\.mjs|diagrams\.mjs|layout\.mjs|reader\.(?:css|js)|render\.mjs|writing\.mjs)$/;
 const gates = ['generated', 'browser', 'webm', 'package', 'windows', 'manifest', 'website'];
 const viewerInteraction = /^viewer\/(?:focus|intent-trace|node-finder|node-outline|route-probe|semantic-lens)\.js$/;
 const viewerWithoutMedia = new Set(['viewer/README.md', 'viewer/tree-branches.js']);
@@ -34,18 +32,9 @@ function viewerRebuildCompanion(name) {
     rootTest.test(name) || /^(docs\/|examples\/|archify\/examples\/[^/]+\.html$)/.test(name);
 }
 
-function explainerPresentationCompanion(name) {
-  return explainerPresentation.test(name) || name === 'archify.zip' || name === 'CHANGELOG.md' ||
-    name === 'archify/references/explainer-authoring.md' || name.startsWith('docs/cases/explainer/') ||
-    name === 'test/skill-metadata.test.mjs' ||
-    (/^test\/explainer-[^/]+\.test\.mjs$/.test(name) &&
-      (!name.endsWith('-browser.test.mjs') || maintainedBrowserTests.has(name)));
-}
-
 function independentMediaPath(name) {
-  return explainerPresentationCompanion(name) ||
-    /^archify\/(?:modules\/code-analysis|explainer)\//.test(name) ||
-    /^test\/(?:code-analysis(?:-[^/]+)?|explainer-[^/]+)\.test\.mjs$/.test(name);
+  return name === 'archify.zip' || /^archify\/modules\/code-analysis\//.test(name) ||
+    /^test\/code-analysis(?:-[^/]+)?\.test\.mjs$/.test(name);
 }
 
 export function classifyPaths(paths) {
@@ -56,8 +45,6 @@ export function classifyPaths(paths) {
   const media = new Set();
   const viewerRebuild = paths.some(name => viewerInteraction.test(name) || name === 'viewer/tree-branches.js') &&
     paths.every(viewerRebuildCompanion);
-  const explainerPresentationOnly = paths.some(name => explainerPresentation.test(name)) &&
-    paths.every(explainerPresentationCompanion);
   let sharedRenderChanged = false;
   let archiveChanged = false;
   let requireFull = false;
@@ -96,11 +83,6 @@ export function classifyPaths(paths) {
     if (atlasClient.test(name) || name === atlasGuide) {
       own('atlas'); plan.package = true;
       if (atlasClient.test(name)) plan.browser = true;
-      continue;
-    }
-    if (explainerPresentationOnly && explainerPresentation.test(name)) {
-      own('explainer');
-      plan.browser = plan.package = true;
       continue;
     }
     const renderer = name.match(rendererPath);
@@ -151,15 +133,10 @@ export function classifyPaths(paths) {
     requireFull = true;
   }
   if (requireFull) return full(!paths.every(independentMediaPath));
-  if (archiveChanged && !plan.owners.some(owner => ['renderer', 'viewer', 'authoring', 'schema', 'pr', 'atlas', 'explainer', ...modes.split('|')].includes(owner))) return full();
+  if (archiveChanged && !plan.owners.some(owner => ['renderer', 'viewer', 'authoring', 'schema', 'pr', 'atlas', ...modes.split('|')].includes(owner))) return full();
   plan.webm = media.size > 0;
   if (media.size === 1 && !sharedRenderChanged) [plan.webmProfile] = media;
-  if (explainerPresentationOnly) {
-    // The packaged smoke also verifies Explainer on all three operating systems.
-    plan.browserProfile = 'changed';
-    plan.browserTests = [...new Set([explainerBrowserTest, ...paths.filter(name => maintainedBrowserTests.has(name))])];
-    plan.changedTests = plan.changedTests.filter(name => !plan.browserTests.includes(name));
-  } else if (paths.every(name => maintainedBrowserTests.has(name))) {
+  if (paths.every(name => maintainedBrowserTests.has(name))) {
     // These suites also run their Node-only cases with Chrome available.
     plan.changedTests = [browserGateTest];
     plan.browserTests = paths;

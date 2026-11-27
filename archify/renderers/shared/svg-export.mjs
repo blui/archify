@@ -94,7 +94,7 @@ export async function exportSvgArtifacts({ type, input, output, theme = 'both', 
     throw new SvgExportError(`Unknown diagram type "${type}" for export-svg. Expected one of: ${EXPORT_TYPES.join(', ')}`, {
       code: 'cli/unknown-diagram-type',
       stage: 'arguments',
-      diagnostics: [{ code: 'cli/unknown-diagram-type', message: `export-svg supports ${EXPORT_TYPES.join(', ')}`, supportedFixes: ['use a standalone diagram type (explainer bundles are not exported as a single SVG)'] }],
+      diagnostics: [{ code: 'cli/unknown-diagram-type', message: `export-svg supports ${EXPORT_TYPES.join(', ')}`, supportedFixes: [`use one of: ${EXPORT_TYPES.join(', ')}`] }],
     });
   }
   if (preset !== undefined && !BAKE_PRESETS.includes(preset)) {

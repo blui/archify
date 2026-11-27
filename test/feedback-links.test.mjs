@@ -39,13 +39,3 @@ test('diagram pages carry the feedback colophon and star card unless meta.feedba
   assert.ok(!hidden.includes(footer));
   assert.ok(!hidden.includes('mailto:'));
 });
-
-test('explainer pages carry the feedback colophon and star card unless meta.feedback_links is false', (t) => {
-  const shown = render(t, 'explainer', 'delivery.explainer.json');
-  assert.equal(shown.split(colophon).length - 1, 1);
-  assert.ok(shown.includes('id="colophon-star-tip"'));
-  for (const link of links) assert.ok(shown.includes(link), link);
-  const hidden = render(t, 'explainer', 'delivery.explainer.json', (spec) => { spec.meta.feedback_links = false; });
-  assert.ok(!hidden.includes(colophon));
-  assert.ok(!hidden.includes('mailto:'));
-});

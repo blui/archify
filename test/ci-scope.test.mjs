@@ -157,34 +157,6 @@ test('independent product areas keep broader regressions while omitting both med
   }
 });
 
-test('isolated Explainer rendering changes run its Node and Chrome cases and retain native package smoke', () => {
-  const browser = 'test/explainer-browser.test.mjs';
-  const files = ['archify/explainer/reader.js', 'archify/explainer/diagrams.mjs', 'archify/explainer/render.mjs',
-    'test/explainer-renderer.test.mjs', browser, 'archify.zip'];
-  const plan = classifyPaths(files);
-  assert.equal(plan.scope, 'core');
-  assert.deepEqual(plan.owners, ['explainer']);
-  assert.deepEqual(plan.browserTests, [browser]);
-  assert.equal(plan.browserProfile, 'changed');
-  assert.ok(plan.browser && plan.package);
-  for (const gate of ['generated', 'webm', 'windows', 'manifest', 'website']) assert.equal(plan[gate], false, gate);
-  const available = [browser, 'test/explainer-renderer.test.mjs', 'test/explainer-cli.test.mjs',
-    'test/explainer-input-publication.test.mjs', 'test/repository-evidence-replacement.test.mjs'];
-  assert.deepEqual(selectAffectedTests(plan.owners, plan.changedTests, available),
-    ['test/explainer-cli.test.mjs', 'test/explainer-input-publication.test.mjs', 'test/explainer-renderer.test.mjs']);
-  assert.equal(classifyPaths([...files, 'docs/cases/explainer/first-rental.html']).website, true);
-  const sources = classifyPaths([...files, 'archify/explainer/sources.mjs']);
-  assert.equal(sources.scope, 'full');
-  assert.ok(sources.windows && !sources.webm);
-  for (const extra of ['archify/bin/archify.mjs',
-    'archify/renderers/shared/generated-validators.mjs', 'archify/assets/template.html',
-    'test/helpers/unknown.mjs']) {
-    const mixed = classifyPaths([...files, extra]);
-    assert.equal(mixed.scope, 'full', extra);
-    assert.ok(mixed.webm && mixed.windows, extra);
-  }
-});
-
 test('five README languages and changelog use documentation checks and preserve mixed product gates', () => {
   const readmes = ['README.md', 'README_EN.md', 'README_ZH.md', 'README_JA.md', 'README_KO.md'];
   const available = ['readme-showcase', 'readme-support', 'cursor-onboarding', 'llms-txt', 'skill-metadata',
@@ -386,7 +358,7 @@ test('main/manual are exhaustive; invalid dev base falls back to full but PR bas
   assert.throws(() => comparisonPlan({ event: 'pull_request', base: 'bad' }));
   assert.throws(() => comparisonPlan({ event: 'pull_request', base: 'a'.repeat(40) }, fail));
   const typeChange = comparisonPlan({ event: 'pull_request', base: 'a'.repeat(40) },
-    () => 'T\0archify/explainer/reader.js\0');
+    () => 'T\0archify/assets/template.html\0');
   assert.equal(typeChange.scope, 'full');
   assert.equal(typeChange.webm, true);
 });
@@ -450,7 +422,7 @@ test('local affected checks use committed and dirty paths and reject ambiguous o
   `);
   const executed = () => fs.readFileSync(receipt, 'utf8').split('\n').filter(Boolean).sort();
   fs.mkdirSync(path.join(root, 'test'));
-  for (const name of [...tests.slice(0, -1), 'browser-gate', 'explainer-render']) writeSuite(name);
+  for (const name of [...tests.slice(0, -1), 'browser-gate', 'architecture-delta']) writeSuite(name);
   fs.writeFileSync(fixture('unrelated'), 'throw new Error("unrelated suite ran");');
   fs.writeFileSync(path.join(root, 'scripts', 'run-browser-tests.mjs'), `
     import fs from 'node:fs';
@@ -473,9 +445,9 @@ test('local affected checks use committed and dirty paths and reject ambiguous o
   assert.equal(ci.status, 0, ci.stderr);
   assert.deepEqual(executed(), ['committed']);
   fs.writeFileSync(receipt, '');
-  const ownerOnly = runner([], { CI_TEST_OWNERS: '["explainer"]' });
+  const ownerOnly = runner([], { CI_TEST_OWNERS: '["delta"]' });
   assert.equal(ownerOnly.status, 0, ownerOnly.stderr);
-  assert.deepEqual(executed(), ['explainer-render']);
+  assert.deepEqual(executed(), ['architecture-delta']);
   fs.writeFileSync(receipt, '');
   fs.appendFileSync(fixture('committed'), '// branch change\n');
   git(['add', '.']);
@@ -512,15 +484,6 @@ test('local affected checks use committed and dirty paths and reject ambiguous o
   assert.equal(websiteOnly.status, 1);
   assert.match(websiteOnly.stderr, /No runnable local checks/);
   fs.unlinkSync(path.join(root, 'website', 'content.md'));
-  fs.mkdirSync(path.join(root, 'archify', 'explainer'));
-  fs.writeFileSync(path.join(root, 'archify', 'explainer', 'reader.js'), 'explainer source edit');
-  fs.writeFileSync(receipt, '');
-  const explainer = local();
-  assert.equal(explainer.status, 0, explainer.stderr);
-  assert.deepEqual(executed(), ['explainer-render']);
-  assert.deepEqual(JSON.parse(fs.readFileSync(browserReceipt, 'utf8')), ['test/explainer-browser.test.mjs']);
-  assert.match(explainer.stdout, /CI also selects core smoke, package/);
-  fs.unlinkSync(path.join(root, 'archify', 'explainer', 'reader.js'));
   writeSuite('i18n-browser');
   fs.writeFileSync(receipt, '');
   const browserOnly = local();

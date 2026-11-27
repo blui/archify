@@ -118,7 +118,7 @@ You can also run `node bin/archify.mjs start "/path/to/project" [--ir architectu
 
 ## Agent entry and investigation
 
-Code Analysis is independent of native diagrams, explainers and stories. Ordinary diagram requests use `finalize` and deliver the diagram alone. For architecture health, coupling, cycles, configured layers, large files, complexity or refactoring orientation, prepare the standalone investigation directly:
+Code Analysis is independent of native diagrams. Ordinary diagram requests use `finalize` and deliver the diagram alone. For architecture health, coupling, cycles, configured layers, large files, complexity or refactoring orientation, prepare the standalone investigation directly:
 
 ```sh
 node bin/archify.mjs code-analysis prepare /path/to/repo --out out/project-analysis --language ts --locale zh-CN

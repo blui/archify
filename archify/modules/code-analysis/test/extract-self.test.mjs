@@ -61,5 +61,4 @@ test('extract: archify/ self-bootstrap is deterministic and preserves known impo
   assert.ok(generated.includes('renderers/shared/generated-brand-marks.mjs'));
   assert.ok(generated.includes('renderers/shared/generated-validators.mjs'));
   assert.ok(generated.includes('renderers/shared/vendor/html-parser.mjs'));
-  assert.ok(generated.some((p) => p.startsWith('explainer/vendor/pele/chunks/')));
 });
