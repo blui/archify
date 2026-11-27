@@ -4,8 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {test} from 'node:test';
 import {extractFacts,loadConfig} from '../lib/analysis.mjs';
-import {buildQuestion} from '../lib/explain.mjs';
-import {captureChangeSide,buildChangeQuestion} from '../lib/change-question.mjs';
+import { readEntry } from './entry-reader.mjs';
 import {schemaErrors} from '../extract/shared/schema.mjs';
 const ns=' xmlns="http://maven.apache.org/POM/4.0.0"';
 const parent='<parent><groupId>p</groupId><artifactId>parent</artifactId><version>1</version><relativePath>../parent-pom.xml</relativePath></parent>';
@@ -32,16 +31,16 @@ test('declared jar and test-jar routes support captured main target and test par
  const args=fixture(t);const {facts}=extractFacts(args.root,{language:'java',config:args.config});
  assert.deepEqual(schemaErrors('raw-facts',facts),[]);assert.equal(facts.callModel,'java-static-lexical-v5');
  const bad=structuredClone(facts);bad.languageScope.metadata[0].sourceText+='changed';assert.ok(schemaErrors('raw-facts',bad).some(e=>String(e.message).includes('hash')));
- const absent=structuredClone(facts);delete absent.languageScope;assert.equal(buildQuestion({...args,facts:absent,symbol:'Calls.go()',question:'Can missing project inputs establish coverage?'}).calls.coverage,'unavailable');
+ const absent=structuredClone(facts);delete absent.languageScope;assert.equal(readEntry({...args,facts:absent,symbol:'Calls.go()'}).calls.coverage,'unavailable');
  const call=facts.calls[0];assert.equal(call.target.file,'api/src/main/java/p/Api.java');
  assert.equal(call.qualifierAncestry[0].file,'api/src/test/java/q/Parent.java');
  assert.deepEqual(new Set(call.buildEvidence.map(p=>p.file)),new Set(['caller/pom.xml','parent-pom.xml','pom.xml','api/pom.xml']));
  assert.equal(facts.files.length,3);assert.ok(!facts.files.some(f=>f.path.endsWith('.xml')));
- const q=buildQuestion({...args,facts,symbol:'Calls.go()',question:'Which declared project source is this static call candidate?'});
+ const q=readEntry({...args,facts,symbol:'Calls.go()'});
  assert.equal(q.calls.records[0].targetNavigation.status,'valid');
  assert.equal(q.calls.records[0].targetNavigation.buildEvidence.length,4);
  fs.appendFileSync(path.join(args.root,'parent-pom.xml'),'\n<!-- changed -->');
- const stale=buildQuestion({...args,facts,symbol:'Calls.go()',question:'Are the same build inputs still present?'});
+ const stale=readEntry({...args,facts,symbol:'Calls.go()'});
  assert.equal(stale.entry.factsStatus,'resolution-input-changed');assert.equal(stale.calls.coverage,'unavailable');
 });
 test('main/test roles, dependency kind/version, missing parent and conditional dependencies cannot grant a cross-project target',t=>{
@@ -144,7 +143,7 @@ test('a Maven archetype template POM is not a project or resolution input',t=>{
  assert.ok(!facts.languageScope.projects.some(project=>project.file==='caller/src/main/resources/archetype-resources/pom.xml'));
  assert.ok(!facts.languageScope.metadata.some(input=>input.file==='caller/src/main/resources/archetype-resources/pom.xml'));
  fs.appendFileSync(template,'\n<!-- changed template -->');
- const question=buildQuestion({...args,facts,symbol:'Calls.go()',question:'Is this source call still navigable?'});
+ const question=readEntry({...args,facts,symbol:'Calls.go()'});
  assert.equal(question.calls.records[0].targetNavigation.status,'valid');
 });
 test('an invalid sibling Maven project does not suppress a valid direct source route',t=>{
@@ -217,19 +216,6 @@ test('inherited dependency keys that collide after child interpolation cannot gr
  const {facts}=extractFacts(args.root,{language:'java',config:args.config});
  assert.equal(facts.calls[0].resolution,'unresolved');
  assert.equal(facts.calls[0].reason,'java-inherited-build-scope');
-});
-test('paired declared dependency references keep BOM metadata fresh and disable navigation after a parent input changes',t=>{
- const args=fixture(t);const pom=path.join(args.root,'parent-pom.xml');fs.writeFileSync(pom,'\uFEFF'+fs.readFileSync(pom,'utf8'));
- const head=fs.mkdtempSync(path.join(os.tmpdir(),'archify-java-projects-head-'));t.after(()=>fs.rmSync(head,{recursive:true,force:true}));fs.cpSync(args.root,head,{recursive:true});
- const api=path.join(head,'api/src/main/java/p/Api.java');fs.writeFileSync(api,fs.readFileSync(api,'utf8').replace('void run(){}','void run(){int changed=1;}'));
- const base=captureChangeSide(args.root,args.config,'java'),capture=captureChangeSide(head,args.config,'java');
- const input={base,head:capture,config:args.config,entry:'api/src/main/java/p/Api.java',question:'Which declared project callers refer to this changed source implementation?'};
- const fresh=buildChangeQuestion(input);assert.equal(fresh.status,'ready');
- const change=fresh.changedDefinitions.items.find(item=>item.head.definition.name==='run');assert.ok(change);
- for(const side of ['base','head'])assert.equal(change[side].knownReferences.total,1);
- fs.appendFileSync(path.join(head,'parent-pom.xml'),'\n<!-- changed after capture -->');
- const stale=buildChangeQuestion(input);assert.equal(stale.status,'partial');
- const ref=stale.changedDefinitions.items.find(item=>item.head.definition.name==='run').head.knownReferences.items[0];assert.equal(ref.navigation.status,'resolution-input-changed');assert.equal(ref.navigation.location,null);
 });
 test('an inherited profile property that changes a nested dependency version cannot establish a default project route',t=>{
  const args=fixture(t,{version:'${route}'}),caller=path.join(args.root,'caller/pom.xml');

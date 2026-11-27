@@ -5,8 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { extractFacts, loadConfig, mergeConfig, buildGraph, evaluateGraph } from '../lib/analysis.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
-import { captureChangeSide, buildChangeQuestion } from '../lib/change-question.mjs';
+import { readEntry } from './entry-reader.mjs';
 import { buildTask } from '../lib/task.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
 function fixture(t,files,edition='2021'){
@@ -61,14 +60,9 @@ test('Rust native LF ranges preserve bare CR inside block comments', t => {
  const source = '/* a\rb */ pub fn work()->i32 {/* c\rd */ 1}\npub fn caller()->i32 {work()}\n';
  const root = fixture(t, {'src/lib.rs': source});
  const facts = capture(root); assert.deepEqual(schemaErrors('raw-facts', facts), []);
- const question = buildQuestion({root,facts,entry:'src/lib.rs',symbol:'caller',question:'Where is work?'});
+ const question = readEntry({root,facts,entry:'src/lib.rs',symbol:'caller'});
  assert.equal(question.calls.coverage,'available');
  assert.deepEqual(question.calls.records[0].targetNavigation.location,{file:'src/lib.rs',name:'work',line:1,column:11});
- const settings=config(); const base=captureChangeSide(root,settings,'rust');
- const headRoot=fixture(t,{'src/lib.rs':source.replace('d */ 1','d */ 2')});
- const head=captureChangeSide(headRoot,settings,'rust');
- const pair=buildChangeQuestion({root:headRoot,baseRoot:root,base,head,config:settings,entry:'src/lib.rs',question:'What changed?'});
- assert.equal(pair.status,'ready');assert.equal(pair.changedDefinitions.total,1);assert.equal(pair.changedDefinitions.items[0].head.knownReferences.total,1);
 });
 
 test('Rust crate paths, module use aliases and block-use hoisting navigate to exact definitions',t=>{
@@ -77,7 +71,7 @@ test('Rust crate paths, module use aliases and block-use hoisting navigate to ex
  assert.ok(calls(facts,'src/lib.rs').every(c=>c.resolution==='rust-direct-function'));
  assert.deepEqual(calls(facts,'src/lib.rs')[0].target,{file:'src/util.rs',name:'work',line:1,column:1});
  assert.ok(facts.imports.some(i=>i.from==='src/lib.rs'&&i.to==='src/util.rs'&&i.line===2));
- const question=buildQuestion({root,facts,entry:'src/lib.rs',symbol:'caller',question:'Where is work?'});assert.equal(question.calls.coverage,'available');assert.ok(question.calls.records.every(r=>r.targetNavigation.status==='valid'));
+ const question=readEntry({root,facts,entry:'src/lib.rs',symbol:'caller'});assert.equal(question.calls.coverage,'available');assert.ok(question.calls.records.every(r=>r.targetNavigation.status==='valid'));
 });
 
 test('Rust editions preserve root vs local use namespaces and value names do not shadow modules',t=>{
@@ -127,7 +121,7 @@ mod consumer {
  const rows=calls(facts,'src/lib.rs').filter(c=>[10,11,12,13].includes(c.line)&&c.target?.name==='run');
  assert.deepEqual(rows.map(c=>c.target.line),[4,4,3,4]);
  assert.ok(rows.every(c=>c.resolution==='rust-inherent-source-candidate'));
- const question=buildQuestion({root,facts,entry:'src/lib.rs',symbol:'caller',question:'Where does run resolve?'});
+ const question=readEntry({root,facts,entry:'src/lib.rs',symbol:'caller'});
  assert.equal(question.calls.coverage,'available');
  assert.deepEqual(question.calls.records.filter(r=>r.targetNavigation?.location?.name==='run').map(r=>r.targetNavigation.location.line),[4,4,3,4]);
 });
@@ -218,7 +212,7 @@ test('Rust rust-analyzer cfg boundary requires a selected trait method declarati
   const call=calls(facts,'src/lib.rs')[0];
   if(selected){
    assert.equal(call.resolution,'rust-trait-method-candidate');
-   assert.equal(buildQuestion({root,facts,entry:'src/lib.rs',symbol:'caller',question:'Where is go?'}).calls.records[0].targetNavigation.status,'valid');
+   assert.equal(readEntry({root,facts,entry:'src/lib.rs',symbol:'caller'}).calls.records[0].targetNavigation.status,'valid');
   }else{
    assert.equal(call.resolution,'unresolved');
    assert.equal(call.reason,'rust-cfg-unselected');
@@ -348,7 +342,7 @@ fn test<U, T: Trait<U>>(t: T) {
  assert.ok(call,`missing target for ${row.name}: ${JSON.stringify(calls(facts,'src/lib.rs'))}`);
  assert.equal(call.resolution,row.resolution);
  assert.equal(call.target.line,row.targetLine);
- const question=buildQuestion({root,facts,entry:'src/lib.rs',symbol:row.symbol||'bar',question:`Where does ${method} resolve?`});
+ const question=readEntry({root,facts,entry:'src/lib.rs',symbol:row.symbol||'bar'});
  assert.equal(question.calls.coverage,'available');
  assert.ok(question.calls.records.some(r=>r.targetNavigation?.location?.name===method&&r.targetNavigation.location.line===row.targetLine));
 });
@@ -356,19 +350,19 @@ fn test<U, T: Trait<U>>(t: T) {
 test('Rust trait declaration navigation requires a captured exact method name',t=>{
  const root=fixture(t,{'src/lib.rs':'mod target;\nuse target::Gate;\nfn caller() { Gate::go(); }\n','src/target.rs':'pub trait Gate { fn go(); }\n'});
  const facts=capture(root);assert.deepEqual(schemaErrors('raw-facts',facts),[]);
- const args={root,facts,entry:'src/lib.rs',symbol:'caller',question:'Where is go?'};
- assert.equal(buildQuestion(args).calls.records[0].targetNavigation.status,'valid');
+ const args={root,facts,entry:'src/lib.rs',symbol:'caller'};
+ assert.equal(readEntry(args).calls.records[0].targetNavigation.status,'valid');
  const forged=structuredClone(facts);
  forged.traits[0].methods[0].sourceRange.sha256='0'.repeat(64);
  assert.ok(schemaErrors('raw-facts',forged).some(error=>error.path==='/traits/0/methods/0/sourceRange'));
- assert.equal(buildQuestion({...args,facts:forged}).calls.records[0].targetNavigation.reason,'target-range-unavailable');
+ assert.equal(readEntry({...args,facts:forged}).calls.records[0].targetNavigation.reason,'target-range-unavailable');
  const shortened=structuredClone(facts);
  shortened.traits[0].methods[0].sourceRange.endColumn--;
  shortened.traits[0].methods[0].sourceRange.sha256=createHash('sha256').update('g').digest('hex');
  assert.ok(schemaErrors('raw-facts',shortened).some(error=>error.path==='/traits/0/methods/0/sourceRange'));
- assert.equal(buildQuestion({...args,facts:shortened}).calls.records[0].targetNavigation.reason,'target-range-unavailable');
+ assert.equal(readEntry({...args,facts:shortened}).calls.records[0].targetNavigation.reason,'target-range-unavailable');
  fs.appendFileSync(path.join(root,'src/target.rs'),'// edited\n');
- assert.equal(buildQuestion(args).calls.records[0].targetNavigation.status,'changed');
+ assert.equal(readEntry(args).calls.records[0].targetNavigation.status,'changed');
 });
 
 test('Rust v14 captures retain direct function navigation without a v15 trait name range',t=>{
@@ -378,7 +372,7 @@ test('Rust v14 captures retain direct function navigation without a v15 trait na
  historical.repository.adapterRevision=14;
  for(const trait of historical.traits)for(const method of trait.methods)delete method.sourceRange;
  assert.deepEqual(schemaErrors('raw-facts',historical),[]);
- const question=buildQuestion({root,facts:historical,entry:'src/lib.rs',symbol:'caller',question:'Where do these calls go?'});
+ const question=readEntry({root,facts:historical,entry:'src/lib.rs',symbol:'caller'});
  assert.equal(question.calls.coverage,'available');
  const trait=question.calls.records.find(record=>record.fact.target?.name==='go');
  const direct=question.calls.records.find(record=>record.fact.target?.name==='work');
@@ -392,11 +386,11 @@ test('Rust rust-analyzer navigation deduplicates agreeing trait anchors across l
  const root=fixture(t,{'src/lib.rs':'mod shared;\n','src/main.rs':'mod shared;\nfn main() {}\n','src/shared.rs':'trait Gate { fn go() {} }\nfn caller<T: Gate>() { T::go(); }\n'});
  const facts=capture(root);assert.deepEqual(schemaErrors('raw-facts',facts),[]);
  assert.equal(facts.traits.length,2,'the source is captured in both crate contexts');
- const args={root,facts,entry:'src/shared.rs',symbol:'caller',question:'Where is go?'};
- assert.equal(buildQuestion(args).calls.records[0].targetNavigation.status,'valid');
+ const args={root,facts,entry:'src/shared.rs',symbol:'caller'};
+ assert.equal(readEntry(args).calls.records[0].targetNavigation.status,'valid');
  const forged=structuredClone(facts);
  forged.traits[1].methods[0].sourceRange.sha256='0'.repeat(64);
- assert.equal(buildQuestion({...args,facts:forged}).calls.records[0].targetNavigation.reason,'target-range-unavailable');
+ assert.equal(readEntry({...args,facts:forged}).calls.records[0].targetNavigation.reason,'target-range-unavailable');
 });
 
 // hir-ide/tests/traits.rs::closure_as_argument_inference_order, with a body
@@ -449,7 +443,7 @@ for(const row of [
  const facts=capture(root,row.options);assert.deepEqual(schemaErrors('raw-facts',facts),[]);
  const edges=facts.calls.filter(call=>call.target).map(call=>`${call.directCaller?.name}>${call.target.name}@${call.target.file}:${call.target.line}`).sort();
  assert.deepEqual(edges,row.edges.slice().sort(),row.name);
- const question=buildQuestion({root,facts,entry:'src/lib.rs',question:'Where are calls resolved?'});
+ const question=readEntry({root,facts,entry:'src/lib.rs'});
  assert.equal(question.calls.coverage,'available');
  assert.ok(question.calls.records.every(record=>record.targetNavigation.status==='valid'));
 });
@@ -458,19 +452,10 @@ for(const row of [
 test('Rust rust-analyzer test_find_struct_function_refs_outside_module direct call reference',t=>{
  const source='mod foo { pub struct Foo; impl Foo { pub fn new() -> Foo { Foo } } }\nfn main() { let _f = foo::Foo::new(); }\n';
  const changed=source.replace('new() -> Foo { Foo }','new() -> Foo { let value = Foo; value }');
- const baseRoot=fixture(t,{'src/lib.rs':source});
- const headRoot=fixture(t,{'src/lib.rs':changed});
- const settings=config();
- const base=captureChangeSide(baseRoot,settings,'rust');
- const head=captureChangeSide(headRoot,settings,'rust');
- const call=head.facts.calls.find(call=>call.directCaller?.name==='main');
+ const root=fixture(t,{'src/lib.rs':changed});
+ const call=capture(root).calls.find(call=>call.directCaller?.name==='main');
  assert.equal(call?.target?.name,'new');
  assert.equal(call.target.line,1);
- const result=buildChangeQuestion({base,head,config:settings,entry:'src/lib.rs',question:'Which captured call reaches the changed new function?'});
- const item=result.changedDefinitions.items.find(item=>item.head.definition.name==='new');
- assert.equal(item.head.knownReferences.total,1);
- assert.equal(item.head.knownReferences.items[0].fact.directCaller.name,'main');
- assert.equal(item.head.knownReferences.items[0].navigation.status,'valid');
 });
 
 test('Rust cfg profile, unknown build flags and path attributes preserve target boundaries',t=>{
@@ -485,10 +470,9 @@ test('Rust workspace dependency aliases point to the actual library crate rather
  const facts=capture(root);assert.deepEqual(schemaErrors('raw-facts',facts),[]);assert.equal(calls(facts,'app/src/lib.rs')[0].target.file,'api/src/lib.rs');
 });
 
-test('Rust UTF16/source hashes, fresh paired references and metadata changes reuse investigation evidence',t=>{
+test('Rust UTF16/source hashes and metadata changes reuse investigation evidence',t=>{
  const text='pub fn work(){let _="😀";}\npub fn caller(){work();}\n';const root=fixture(t,{'src/lib.rs':text});const cfg=config();const facts=capture(root);assert.deepEqual(schemaErrors('raw-facts',facts),[]);
- const base=captureChangeSide(root,cfg,'rust');const headRoot=fixture(t,{'src/lib.rs':text.replace('"😀"','"😀 changed"')});const head=captureChangeSide(headRoot,cfg,'rust');const paired=buildChangeQuestion({question:'Known callers?',entry:'src/lib.rs',base,head,config:cfg});const changed=paired.changedDefinitions.items.find(row=>row.head.definition.name==='work');assert.equal(changed.head.knownReferences.total,1);
- fs.appendFileSync(path.join(root,'Cargo.toml'),'\n# changed manifest\n');const q=buildQuestion({root,facts,entry:'src/lib.rs',symbol:'caller',question:'Fresh?'});assert.equal(q.calls.coverage,'unavailable');assert.equal(q.entry.factsStatus,'resolution-input-changed');
+ fs.appendFileSync(path.join(root,'Cargo.toml'),'\n# changed manifest\n');const q=readEntry({root,facts,entry:'src/lib.rs',symbol:'caller'});assert.equal(q.calls.coverage,'unavailable');assert.equal(q.entry.factsStatus,'resolution-input-changed');
 });
 
 test('Rust unknown conditional imports and duplicate block aliases never select an arbitrary target',t=>{
@@ -553,7 +537,7 @@ type Alias=text::Regex;fn alias(){Alias::new();}
  for(const line of [5,6,7]){const call=calls(facts,'src/lib.rs').find(c=>c.line===line);assert.equal(call.resolution,'rust-trait-method-candidate',`line ${line}`);assert.equal(call.target.line,3)}
  const qualified=calls(facts,'src/lib.rs').find(c=>c.line===10);assert.equal(qualified.resolution,'rust-trait-impl');assert.equal(qualified.target.line,9);
  for(const line of [14,15])assert.equal(calls(facts,'src/lib.rs').find(c=>c.line===line).resolution,'unresolved',`line ${line}`);
- const question=buildQuestion({root,facts,entry:'src/lib.rs',symbol:'caller',question:'Where are the constructors?'});
+ const question=readEntry({root,facts,entry:'src/lib.rs',symbol:'caller'});
  assert.ok(question.calls.records.every(r=>r.targetNavigation.status==='valid'));
  const legacy=structuredClone(facts);legacy.callModel='rust-source-direct-v1';
  assert.ok(schemaErrors('raw-facts',legacy).some(e=>String(e.message).includes('v2')));
@@ -618,7 +602,7 @@ impl Boxed<String>{pub fn new()->Self{Self(String::new())}}
  assert.ok(direct.every(c=>c.resolution==='rust-specialized-inherent-source-candidate'));
  assert.ok(direct.every(c=>c.target.file==='src/model.rs'&&c.target.line===2&&c.target.name==='new'));
  assert.equal(calls(facts,'src/lib.rs').find(c=>c.line===4).resolution,'unresolved');
- const question=buildQuestion({root,facts,entry:'src/lib.rs',symbol:'caller',question:'Which constructor source is the candidate?'});
+ const question=readEntry({root,facts,entry:'src/lib.rs',symbol:'caller'});
  assert.ok(question.calls.records.every(r=>r.targetNavigation.status==='valid'));
  const legacy=structuredClone(facts);legacy.callModel='rust-source-direct-v2';
  assert.ok(schemaErrors('raw-facts',legacy).some(e=>String(e.message).includes('v3')));
@@ -641,21 +625,6 @@ fn chosen(){Choice::new();Receiver::new();Lifetime::new();Fixed::new();General::
  assert.ok(uncertain.every(c=>c.resolution==='unresolved'));
 });
 
-test('Rust changed specialized constructor retrieves its verified imported caller',t=>{
- const lib='mod model;use crate::model::Boxed as Imported;\npub fn caller(){Imported::new();}\n';
- const before='pub struct Boxed<T>(T);\nimpl Boxed<String>{pub fn new()->Self{Self(String::new())}}\n';
- const baseRoot=fixture(t,{'src/lib.rs':lib,'src/model.rs':before});
- const root=fixture(t,{'src/lib.rs':lib,'src/model.rs':before.replace('String::new()','String::from("changed")')});
- const cfg=config(),base=captureChangeSide(baseRoot,cfg,'rust'),head=captureChangeSide(root,cfg,'rust');
- const brief=buildChangeQuestion({base,head,config:cfg,entry:'src/model.rs',question:'Which known caller references the changed constructor?'});
- assert.equal(brief.changedDefinitions.total,1);
- for(const side of ['base','head']){
-  const refs=brief.changedDefinitions.items[0][side].knownReferences;
-  assert.equal(refs.coverage,'available');assert.equal(refs.total,1);
-  assert.equal(refs.items[0].navigation.status,'valid');assert.equal(refs.items[0].navigation.location.file,'src/lib.rs');
- }
-});
-
 test('Rust lifetime-only constructor paths preserve imported identity and distinguish enum variants',t=>{
  const root=fixture(t,{'Cargo.toml':'[workspace]\nmembers=["api","app"]\nresolver="2"\n',
  'api/Cargo.toml':'[package]\nname="borrowed-api"\nversion="0.1.0"\nedition="2021"\n[lib]\nname="actual_api"\n',
@@ -675,7 +644,7 @@ pub fn variant(){Collision::Make("value");}
  assert.ok(direct.every(c=>c.resolution==='rust-lifetime-inherent-source-candidate'&&c.target.file==='api/src/model.rs'));
  assert.deepEqual(direct.map(c=>c.target.line),[2,2,4]);
  assert.equal(calls(facts,'api/src/model.rs').find(c=>c.line===7).resolution,'unresolved');
- const q=buildQuestion({root,facts,entry:'app/src/lib.rs',symbol:'caller',question:'Which borrowed implementation is selected by these paths?'});
+ const q=readEntry({root,facts,entry:'app/src/lib.rs',symbol:'caller'});
  assert.ok(q.calls.records.every(r=>r.targetNavigation.status==='valid'));
  const old=structuredClone(facts);old.callModel='rust-source-direct-v3';assert.ok(schemaErrors('raw-facts',old).some(e=>String(e.message).includes('v4')));
 });
@@ -695,20 +664,6 @@ fn unsupported(){Bounded::new();Mixed::new();Concrete::new();Shared::new();Recei
  const facts=capture(root);assert.deepEqual(schemaErrors('raw-facts',facts),[]);
  const selected=calls(facts,'src/lib.rs').filter(c=>c.line===10);assert.equal(selected.length,8);
  assert.ok(selected.every(c=>c.resolution==='unresolved'));
-});
-
-test('Rust paired changed lifetime constructor retrieves its captured imported caller',t=>{
- const lib='mod model;use crate::model::Borrowed as Imported;\npub fn caller(){Imported::new("value");}\n';
- const before="pub struct Borrowed<'a>(&'a str);\nimpl<'a> Borrowed<'a>{pub fn new(v:&'a str)->Self{Self(v)}}\n";
- const baseRoot=fixture(t,{'src/lib.rs':lib,'src/model.rs':before});
- const root=fixture(t,{'src/lib.rs':lib,'src/model.rs':before.replace('Self(v)','Self(if v.is_empty(){"changed"}else{v})')});
- const cfg=config(),base=captureChangeSide(baseRoot,cfg,'rust'),head=captureChangeSide(root,cfg,'rust');
- const q=buildChangeQuestion({base,head,config:cfg,entry:'src/model.rs',question:'Which known caller refers to this changed borrowed constructor?'});
- assert.equal(q.changedDefinitions.total,1);
- for(const side of ['base','head']){
-  const refs=q.changedDefinitions.items[0][side].knownReferences;assert.equal(refs.coverage,'available');assert.equal(refs.total,1);
-  assert.equal(refs.items[0].fact.resolution,'rust-lifetime-inherent-source-candidate');assert.equal(refs.items[0].navigation.status,'valid');
- }
 });
 
 test('Rust trait impl calls separate definite targets from trait-only candidates',t=>{
@@ -735,17 +690,6 @@ pub fn ambiguous(x: &A) { x.act(); }
  const edges=facts.traitImplementations.filter(edge=>edge.traitMethod.name==='act');
  assert.deepEqual(edges.filter(edge=>edge.trait.name==='Left').map(edge=>edge.selfType).sort(),['A','B']);
  assert.deepEqual(edges.filter(edge=>edge.selfType==='A').map(edge=>edge.trait.name).sort(),['Left','Right']);
- const settings=config();const headRoot=fixture(t,{'src/lib.rs':fs.readFileSync(path.join(root,'src/lib.rs'),'utf8').replace('fn act(&self) -> u8 { 1 }','fn act(&self) -> u8 { 10 }')});
- const pair=buildChangeQuestion({base:captureChangeSide(root,settings,'rust'),head:captureChangeSide(headRoot,settings,'rust'),config:settings,entry:'src/lib.rs',question:'Which callers reach the changed trait method?'});
- const a=pair.unpairedDefinitions.items.find(item=>item.side==='head'&&item.definition.line===5);
- assert.ok(a,'duplicate trait-method qualnames stay explicit; the head impl Left for A remains inspectable');
- assert.equal(a.reason,'duplicate-slot');
- const direct=a.knownReferences.items.map(record=>record.fact.line);
- assert.deepEqual(direct,[8]);
- const candidates=a.traitCandidates;assert.equal(candidates.coverage,'available');assert.equal(candidates.runtimeTarget,'not-determined');
- assert.deepEqual(candidates.items.map(record=>record.fact.line),[9,9,10]);
- assert.ok(candidates.items.every(record=>record.fact.target.line===1&&record.reason.includes('not determined')));
- assert.equal(a.traitCandidates.role.includes('not proof of runtime dispatch'),true);
 });
 
 test('Rust trait default bodies are inventoried once with context and leave Self-dependent calls unknown', t => {
@@ -800,7 +744,7 @@ impl Defaults for A {}
  assert.equal(outer.directCaller.name,'twice');assert.equal(outer.directCaller.kind,'trait-default-method');assert.equal(outer.directCaller.column,5);
 });
 
-test('Rust changed trait default method lists trait-bound calls but not concrete impl calls', t => {
+test('Rust trait-bound calls to a default method resolve to the trait declaration', t => {
  const body = (result) => `pub trait Gate {
     fn enabled(&self) -> bool { ${result} }
 }
@@ -815,21 +759,14 @@ fn accept<G: Gate>(g: &G) -> bool { g.enabled() }
 
 fn concrete(s: &S) -> bool { s.enabled() }
 `;
- const root=fixture(t,{'src/lib.rs':body('true')});
  const headRoot=fixture(t,{'src/lib.rs':body('false')});
- const settings=config();
- const pair=buildChangeQuestion({root:headRoot,baseRoot:root,base:captureChangeSide(root,settings,'rust'),head:captureChangeSide(headRoot,settings,'rust'),config:settings,entry:'src/lib.rs',question:'Who calls the changed default?'});
- assert.equal(pair.status,'ready');
- const change=pair.changedDefinitions.items[0];
- assert.equal(change.head.definition.qualname,'Gate::enabled');
- assert.equal(change.head.definition.line,2);
- assert.equal(change.head.knownReferences.total,1);
- const ref=change.head.knownReferences.items[0];
- assert.equal(ref.fact.resolution,'rust-trait-method-candidate');
- assert.equal(ref.fact.target.line,2);
- assert.equal(ref.fact.target.column,8);
- assert.equal(ref.fact.directCaller.name,'accept');
- assert.equal(ref.fact.directCaller.kind,'function');
+ const ref=capture(headRoot).calls.find(call=>call.directCaller?.name==='accept');
+ assert.ok(ref);
+ assert.equal(ref.resolution,'rust-trait-method-candidate');
+ assert.equal(ref.target.line,2);
+ assert.equal(ref.target.column,8);
+ assert.equal(ref.directCaller.name,'accept');
+ assert.equal(ref.directCaller.kind,'function');
 });
 
 test('Rust default body self-calls bind the enclosing trait declaration only', t => {
@@ -845,7 +782,6 @@ impl Gate for Plain {}
 fn concrete(s: &S) -> u8 { s.base() }
 fn plain(p: &Plain) -> u8 { p.base() }
 `;
- const root=fixture(t,{'src/lib.rs':body('1')});
  const headRoot=fixture(t,{'src/lib.rs':body('3')});
  const facts=capture(headRoot);
  const via=facts.calls.find(call=>call.directCaller?.name==='via');
@@ -866,11 +802,6 @@ fn plain(p: &Plain) -> u8 { p.base() }
  assert.ok(concrete,'a concrete override call resolves to the impl body');
  assert.equal(concrete.resolution,'rust-trait-impl');
  assert.equal(concrete.target.line,7);
- const settings=config();
- const pair=buildChangeQuestion({root:headRoot,baseRoot:root,base:captureChangeSide(root,settings,'rust'),head:captureChangeSide(headRoot,settings,'rust'),config:settings,entry:'src/lib.rs',question:'Who calls the changed default?'});
- assert.equal(pair.status,'ready');
- const refs=pair.changedDefinitions.items[0].head.knownReferences;
- assert.deepEqual(refs.items.map(record=>record.fact.directCaller.name),['via','plain'],'the override call is not a reference to the default body');
 });
 
 test('Rust zero-argument impl-body macros expose forwarding calls as candidates', t => {
@@ -1543,29 +1474,6 @@ impl Right for S { fn make(&self) -> bool { false } }
  assert.ok(first&&second,'both fields resolve through the swapped impl parameters');
  assert.equal(first.target.line,1);
  assert.equal(second.target.line,2);
-});
-
-test('Rust default-method references stay within the declaring crate file', t => {
- const source = value => `pub trait Gate { fn enabled(&self) -> bool { ${value} } }
-pub fn use_gate<G: Gate>(gate: &G) -> bool { gate.enabled() }
-`;
- const files = {
-  'Cargo.toml': '[workspace]\nmembers=["api","app"]\nresolver="2"\n',
-  'api/Cargo.toml': '[package]\nname="api"\nversion="0.1.0"\nedition="2021"\n',
-  'app/Cargo.toml': '[package]\nname="app"\nversion="0.1.0"\nedition="2021"\n',
-  'api/src/lib.rs': source('true'),
-  'app/src/lib.rs': source('false')
- };
- const root = fixture(t, files);
- const headRoot = fixture(t, { ...files, 'api/src/lib.rs': source('1') });
- const settings = config();
- const base = captureChangeSide(root, settings, 'rust');
- const head = captureChangeSide(headRoot, settings, 'rust');
- const pair = buildChangeQuestion({ root: headRoot, baseRoot: root, base, head, config: settings, entry: 'api/src/lib.rs', question: 'Which callers reach Gate::enabled?' });
- const row = (pair.changedDefinitions.items || []).find(item => item.head.definition.file === 'api/src/lib.rs');
- assert.ok(row, 'the changed default body in the api crate is a changed definition');
- assert.equal(row.head.knownReferences.total, 1);
- assert.deepEqual(row.head.knownReferences.items.map(item => item.fact.file), ['api/src/lib.rs']);
 });
 
 test('Rust preserves only single-expression local macro arguments proven used once', t => {

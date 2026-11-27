@@ -53,18 +53,6 @@ how findings divide by rule. Run `check` with `--out` so each lead or structural
 signal is drillable. See
 [First look at an unfamiliar repository](docs/USAGE.md#first-look-at-an-unfamiliar-repository).
 
-`task --question` prepares source orientation without requiring a finding: source
-identity, captured function ranges and direct imports. JS/TS implementation entries
-and fresh Python/Java captures can also include bounded lexical call evidence.
-Python/Java entries require a saved analysis directory containing the .py/.java
-entry from its matching adapter. Historical Python/Java captures without a
-recognized call model retain unavailable coverage and unknown totals.
-The host Agent then follows [the function analysis workflow](docs/FUNCTION-ANALYSIS.md)
-to answer the question from source. The CLI output is an intermediate reading aid.
-Adding `--base-root` with a required `--entry` prepares a fresh before/after source
-comparison, including separate call and module-reading references and explicit
-coverage limits. See [change questions](docs/FUNCTION-ANALYSIS.md#change-questions).
-
 JS/TS analysis defaults to `typescript.sdk: "bundled"`. The bundled compiler
 follows project configs and references without executing code from the analyzed
 checkout. For a trusted project, set `typescript.sdk` to `"auto"` to discover

@@ -5,8 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { extractFacts, loadConfig } from '../lib/analysis.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
-import { buildChangeQuestion, captureChangeSide } from '../lib/change-question.mjs';
+import { readEntry } from './entry-reader.mjs';
 import { schemaErrors } from '../schemas/index.mjs';
 
 const command = process.env.ARCHIFY_JAVA || 'java';
@@ -51,7 +50,7 @@ class Caller { void run(Action action, Api api) { Api.choose("x"); Api.choose(1)
   assert.ok(facts.calls.every(call => call.resolution === 'java-compiler-source-method'));
   assert.ok(facts.methodDeclarations.some(declaration => declaration.name === 'fire'));
   assert.ok(!facts.functions.some(fn => fn.name === 'fire'));
-  const question = buildQuestion({ root, entry: 'Api.java', facts, question: 'Where is fire declared?' });
+  const question = readEntry({ root, entry: 'Api.java', facts });
   const abstractCall = question.calls.records.find(record => record.fact.target?.name === 'fire');
   assert.equal(abstractCall.targetNavigation.status, 'valid');
   assert.equal(abstractCall.targetNavigation.location.line, 1);
@@ -73,11 +72,11 @@ test('Java semantic opt-in requires the direct Maven route and preserves POM fre
   assert.equal(facts.languageScope.semantic.mode, 'complete');
   assert.deepEqual(facts.calls.map(call => call.target?.name), ['stat', 'instance']);
   assert.ok(facts.calls.every(call => call.buildEvidence?.some(point => point.file === 'app/pom.xml')));
-  const args = { root, entry: 'app/src/main/java/probe/app/App.java', facts, question: 'Where are the API calls?' };
-  assert.ok(buildQuestion(args).calls.records.every(record => record.targetNavigation.status === 'valid'));
+  const args = { root, entry: 'app/src/main/java/probe/app/App.java', facts };
+  assert.ok(readEntry(args).calls.records.every(record => record.targetNavigation.status === 'valid'));
   const pom = path.join(root, 'app/pom.xml');
   fs.appendFileSync(pom, '<!-- changed -->');
-  assert.ok(buildQuestion(args).calls.records.every(record => record.targetNavigation.status !== 'valid'));
+  assert.ok(readEntry(args).calls.records.every(record => record.targetNavigation.status !== 'valid'));
   fs.writeFileSync(pom, fs.readFileSync(pom, 'utf8').replace(/<dependencies>.*<\/dependencies>/, ''));
   const absent = capture(root);
   assert.equal(absent.languageScope.semantic.rejectedTargets, 1);
@@ -100,27 +99,9 @@ test('Java semantic bindings keep raw UTF-16 columns for tabbed calls and declar
     assert.equal(facts.languageScope.semantic.rejectedTargets, 0);
     assert.deepEqual(facts.calls.map(call => call.target?.name), ['instance', 'stat', 'fire']);
     assert.ok(facts.calls.every(call => call.target.column === 2));
-    const question = buildQuestion({ root, entry: 'Api.java', facts, question: 'Where are the tabbed methods?' });
+    const question = readEntry({ root, entry: 'Api.java', facts });
     assert.ok(question.calls.records.every(record => record.targetNavigation.status === 'valid'));
   }
-});
-
-test('Java paired questions do not treat source binding counts as changed compiler settings', t => {
-  if (!hasJdk) return t.skip('JDK 17+ not installed for optional semantic coverage');
-  const baseRoot = fixture(t, { 'Api.java': 'class Api { void ping() {} void run(Api api) { api.ping(); } }' });
-  const headRoot = fixture(t, { 'Api.java': 'class Api { void ping() {} void run(Api api) { api.ping(); api.ping(); } }' });
-  const config = loadConfig(); config.java = { semantic: true, release: 8 };
-  const base = captureChangeSide(baseRoot, config, 'java');
-  const head = captureChangeSide(headRoot, config, 'java');
-  assert.equal(base.facts.languageScope.semantic.newTargets, 1);
-  assert.equal(head.facts.languageScope.semantic.newTargets, 2);
-  const question = buildChangeQuestion({ question: 'What changed in run?', entry: 'Api.java', base, head, config });
-  assert.equal(question.status, 'ready');
-  assert.equal(question.changedDefinitions.total, 1);
-  assert.equal(question.comparison.resolutionChanges.optionChanges.total, 0);
-  assert.equal(question.comparison.resolutionChanges.inputChanges.total, 0);
-  assert.equal(head.resolution.options.semantic.release, 8);
-  assert.equal(head.resolution.options.semantic.version, head.facts.languageScope.semantic.version);
 });
 
 test('Java semantic opt-in falls back to JS facts when the local JDK is unavailable', t => {

@@ -5,20 +5,20 @@ import path from 'node:path';
 import { test } from 'node:test';
 import ts from '../vendor/typescript.cjs';
 import { extractFacts } from '../lib/analysis.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
+import { readEntry } from './entry-reader.mjs';
 import { measureFunctions } from '../extract/ts/functions.mjs';
 
 function fixture(t, source, entry = 'entry.mjs') {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-question-calls-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-call-reader-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.writeFileSync(path.join(root, entry), source);
   const { facts } = extractFacts(root, { language: 'ts' });
-  return { root, entry, facts, question: 'Where should I read next?', symbol: 'chosen' };
+  return { root, entry, facts, symbol: 'chosen' };
 }
 
 test('orientation retains exact facts, excludes same-line neighbours, and includes nested source calls without claiming caller identity', (t) => {
   const source = 'function helper() { return () => {}; }\nfunction before() { helper(); } function chosen() { helper()(); function nested() { helper(); } } function after() { helper(); }';
-  const args = fixture(t, source); const calls = buildQuestion(args).calls;
+  const args = fixture(t, source); const calls = readEntry(args).calls;
   assert.equal(calls.coverage, 'available'); assert.equal(calls.total, 3);
   assert.equal(calls.included, 3); assert.equal(calls.omitted, 0);
   assert.ok(calls.limitations.some((s) => /nested functions and closures/.test(s)));
@@ -29,18 +29,18 @@ test('orientation retains exact facts, excludes same-line neighbours, and includ
   for (const r of calls.records) assert.deepEqual(r.fact, args.facts.calls[r.factIndex]);
   assert.equal(calls.selection.range.column, source.split('\n')[1].indexOf('function chosen') + 1);
   assert.equal(calls.selection.range.endColumn, source.split('\n')[1].indexOf(' function after') + 1);
-  const whole = buildQuestion({ ...args, symbol: undefined }).calls;
+  const whole = readEntry({ ...args, symbol: undefined }).calls;
   assert.equal(whole.total, 5); assert.equal(whole.selection.kind, 'entry-file');
 });
 
 test('bounded output counts the selected range and does not confuse omitted unknown calls with absent calls', (t) => {
   const args = fixture(t, 'function helper() {}\nfunction chosen() {\n' + 'helper();\n'.repeat(41) + 'unknown();\n}\nfunction neighbour() { helper(); }');
-  const calls = buildQuestion(args).calls;
+  const calls = readEntry(args).calls;
   assert.equal(calls.total, 42); assert.equal(calls.included, 40); assert.equal(calls.omitted, 2);
   assert.equal(calls.records.length, 40); assert.equal(calls.coverage, 'available');
   assert.ok(calls.limitations.some((s) => /omitted records/.test(s)));
   const empty = fixture(t, 'function chosen() {}', 'empty.cjs');
-  const zero = buildQuestion(empty).calls;
+  const zero = readEntry(empty).calls;
   assert.equal(zero.coverage, 'available'); assert.equal(zero.total, 0); assert.equal(zero.omitted, 0);
 });
 
@@ -53,7 +53,7 @@ test('missing and unknown call models never report a known zero, even when adapt
       facts.calls = [];
       if (model === undefined) delete facts.callModel;
       else facts.callModel = model;
-      const calls = buildQuestion({ ...args, facts }).calls;
+      const calls = readEntry({ ...args, facts }).calls;
       assert.equal(calls.coverage, 'unavailable');
       assert.equal(calls.reason, 'unsupported-or-unknown-call-model');
       assert.equal(calls.bindingCoverage, 'unknown');
@@ -61,26 +61,26 @@ test('missing and unknown call models never report a known zero, even when adapt
     }
   }
   const facts = structuredClone(args.facts); delete facts.calls;
-  assert.equal(buildQuestion({ ...args, facts }).calls.reason, 'calls-not-captured');
-  const absent = buildQuestion({ ...args, facts: null }).calls;
+  assert.equal(readEntry({ ...args, facts }).calls.reason, 'calls-not-captured');
+  const absent = readEntry({ ...args, facts: null }).calls;
   assert.equal(absent.coverage, 'unavailable'); assert.equal(absent.total, null);
 });
 
 test('entry freshness and parse errors gate all calls and same-file targets', (t) => {
   const args = fixture(t, 'function helper() {} function chosen() { helper(); }');
   fs.appendFileSync(path.join(args.root, args.entry), '\n// changed');
-  let calls = buildQuestion(args).calls;
+  let calls = readEntry(args).calls;
   assert.equal(calls.reason, 'entry-changed'); assert.equal(calls.selection.range, null); assert.deepEqual(calls.records, []);
   fs.writeFileSync(path.join(args.root, args.entry), 'function chosen() { missing(); }\nfunction broken( {');
   const facts = extractFacts(args.root, { language: 'ts' }).facts;
-  calls = buildQuestion({ ...args, facts }).calls;
+  calls = readEntry({ ...args, facts }).calls;
   assert.equal(calls.reason, 'entry-parse-errors'); assert.equal(calls.total, null); assert.deepEqual(calls.records, []);
 });
 
 test('unmatched exact source range is unavailable rather than falling back to captured line span', (t) => {
   const args = fixture(t, 'function chosen() { missing(); }\n// trailing');
   args.facts.functions[0].endLine = 2;
-  const calls = buildQuestion(args).calls;
+  const calls = readEntry(args).calls;
   assert.equal(calls.reason, 'function-range-unavailable'); assert.equal(calls.selection.range, null); assert.deepEqual(calls.records, []);
 });
 
@@ -99,28 +99,28 @@ test('explicit call models carry binding coverage independently of extraction re
   const args = fixture(t, 'function declared() {}\nconst arrow = () => {};\nfunction chosen() { declared(); arrow()(); }');
   assert.equal(args.facts.callModel, 'js-ts-lexical-v6');
   args.facts.repository.adapterRevision += 1;
-  const current = buildQuestion(args).calls;
+  const current = readEntry(args).calls;
   assert.equal(current.coverage, 'available');
   assert.equal(current.provenance.callModel, args.facts.callModel);
   assert.equal(current.bindingCoverage, 'declarations-const-initializers-stable-explicit-exports-and-static-commonjs-require');
   assert.equal(current.records.filter((r) => r.fact.resolution === 'same-file-function-initializer').length, 1);
   const v5 = structuredClone(args.facts); v5.callModel = 'js-ts-lexical-v5'; v5.repository.adapterRevision = 22;
-  const previous = buildQuestion({ ...args, facts: v5 }).calls;
+  const previous = readEntry({ ...args, facts: v5 }).calls;
   assert.equal(previous.coverage, 'available');
   assert.equal(previous.bindingCoverage, 'declarations-const-initializers-and-stable-explicit-exports-through-captured-value-paths');
   const v1 = structuredClone(args.facts); v1.callModel = 'js-ts-lexical-v1'; v1.repository.adapterRevision = 8;
-  const compatible = buildQuestion({ ...args, facts: v1 }).calls;
+  const compatible = readEntry({ ...args, facts: v1 }).calls;
   assert.equal(compatible.coverage, 'available');
   assert.equal(compatible.provenance.callModel, 'js-ts-lexical-v1');
   assert.equal(compatible.bindingCoverage, 'declarations-const-initializers-and-relative-named-imports');
   assert.deepEqual(compatible.records, current.records);
   const older = structuredClone(args.facts); delete older.callModel;
-  const historical = buildQuestion({ ...args, facts: older }).calls;
+  const historical = readEntry({ ...args, facts: older }).calls;
   assert.equal(historical.coverage, 'unavailable'); assert.equal(historical.total, null);
   assert.deepEqual(historical.records, []);
   fs.appendFileSync(path.join(args.root, args.entry), '\n// stale');
-  assert.deepEqual(buildQuestion(args).calls.records, []);
-  assert.deepEqual(buildQuestion({ ...args, facts: older }).calls.records, []);
+  assert.deepEqual(readEntry(args).calls.records, []);
+  assert.deepEqual(readEntry({ ...args, facts: older }).calls.records, []);
 });
 
 test('forwarding source freshness is required before navigating to the captured implementation',t=>{
@@ -128,27 +128,27 @@ test('forwarding source freshness is required before navigating to the captured 
  fs.writeFileSync(path.join(args.root,'api.mjs'),"export {work} from './impl.mjs';\n");
  fs.writeFileSync(path.join(args.root,'impl.mjs'),'export function work(){}\n');
  args.facts=extractFacts(args.root,{language:'ts'}).facts;
- const current=buildQuestion(args).calls.records[0];
+ const current=readEntry(args).calls.records[0];
  assert.equal(current.targetNavigation.status,'valid');
  assert.equal(current.targetNavigation.forwarding[0].location.file,'api.mjs');
  fs.appendFileSync(path.join(args.root,'api.mjs'),'// changed forwarding source\n');
- const changed=buildQuestion(args).calls.records[0];
+ const changed=readEntry(args).calls.records[0];
  assert.equal(changed.targetNavigation.status,'unverifiable');
  assert.equal(changed.targetNavigation.reason,'forwarding-path-changed');
  assert.equal(changed.targetNavigation.location,null);
  fs.rmSync(path.join(args.root,'api.mjs'));
- assert.equal(buildQuestion(args).calls.records[0].targetNavigation.reason,'forwarding-path-missing');
+ assert.equal(readEntry(args).calls.records[0].targetNavigation.reason,'forwarding-path-missing');
 });
 
 test('CommonJS target navigation requires its captured implementation to stay fresh', t => {
   const args = fixture(t, "const { f } = require('./target.cjs'); function chosen() { f(); }", 'entry.cjs');
   fs.writeFileSync(path.join(args.root, 'target.cjs'), 'function f() {} module.exports.f = f;');
   args.facts = extractFacts(args.root, { language: 'ts' }).facts;
-  const current = buildQuestion(args).calls.records.find(record => record.fact.resolution === 'commonjs-function');
+  const current = readEntry(args).calls.records.find(record => record.fact.resolution === 'commonjs-function');
   assert.equal(current.targetNavigation.status, 'valid');
   assert.deepEqual(current.targetNavigation.location, { file: 'target.cjs', name: 'f', line: 1, column: 1 });
   fs.appendFileSync(path.join(args.root, 'target.cjs'), '\n// changed');
-  const stale = buildQuestion(args).calls.records.find(record => record.fact.resolution === 'commonjs-function');
+  const stale = readEntry(args).calls.records.find(record => record.fact.resolution === 'commonjs-function');
   assert.equal(stale.targetNavigation.status, 'changed');
   assert.equal(stale.targetNavigation.location, null);
 });

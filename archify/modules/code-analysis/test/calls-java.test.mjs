@@ -3,10 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { spawnSync } from 'node:child_process';
-import { ARCHIFY_PACKAGE } from './helpers.mjs';
 import { extractFacts } from '../lib/analysis.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
+import { readEntry } from './entry-reader.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
 
 function fixture(t, source) {
@@ -15,7 +13,7 @@ function fixture(t, source) {
   fs.writeFileSync(path.join(root, 'A.java'), source);
   const { facts } = extractFacts(root, { language: 'java' });
   assert.deepEqual(schemaErrors('raw-facts', facts), []);
-  return { root, facts, entry: 'A.java', question: 'Where should I read next?' };
+  return { root, facts, entry: 'A.java' };
 }
 const spelling = (source, call) => source.split(/\r\n|[\r\n]/)[call.line - 1].slice(call.column - 1, call.endColumn - 1);
 
@@ -28,7 +26,7 @@ test('Java calls inventory keeps full chained UTF16 spans and excludes construct
   const [first, chained] = args.facts.calls;
   assert.equal(first.column, source.indexOf('make().') + 1);
   assert.equal(first.column, chained.column);
-  const question = buildQuestion({ ...args, symbol: 'chosen' });
+  const question = readEntry({ ...args, symbol: 'chosen' });
   assert.equal(question.calls.total, 5);
   assert.equal(question.calls.bindingCoverage, 'static-source-candidates-with-captured-parents-and-declared-direct-project-dependencies');
   assert.ok(question.calls.records.filter(record => record.fact.target).every(record => record.targetNavigation.status === 'valid'));
@@ -88,58 +86,48 @@ enum E { VALUE; static void yes() {} void run() { yes(); } }`;
   const args = fixture(t, source);
   assert.equal(args.facts.calls.length, 9);
   assert.equal(args.facts.calls.filter(call => call.target).length, 1);
-  assert.equal(buildQuestion({ ...args, symbol: 'A.chosen()' }).calls.total, 3);
+  assert.equal(readEntry({ ...args, symbol: 'A.chosen()' }).calls.total, 3);
 });
 
 test('Java exact function selection excludes same-line neighbours; historical, zero, parse failure and freshness remain distinct', t => {
   const source = 'class A { static void yes() {} void before() { yes(); } void chosen() { yes(); } void after() { yes(); } void empty() {} }';
   const args = fixture(t, source);
-  const selected = buildQuestion({ ...args, symbol: 'chosen' }).calls;
+  const selected = readEntry({ ...args, symbol: 'chosen' }).calls;
   assert.equal(selected.coverage, 'available'); assert.equal(selected.total, 1);
   assert.equal(selected.records[0].fact.column, source.indexOf('yes();', source.indexOf('void chosen')) + 1);
-  assert.equal(buildQuestion({ ...args, symbol: 'empty' }).calls.total, 0);
+  assert.equal(readEntry({ ...args, symbol: 'empty' }).calls.total, 0);
   const historical = structuredClone(args.facts); delete historical.callModel; historical.calls = [];
-  assert.equal(buildQuestion({ ...args, facts: historical, symbol: 'chosen' }).calls.total, null);
+  assert.equal(readEntry({ ...args, facts: historical, symbol: 'chosen' }).calls.total, null);
   const wrong = structuredClone(args.facts); wrong.calls[0].target.column++;
   assert.ok(schemaErrors('raw-facts', wrong).some(error => error.path === '/calls/0/target'));
   const corrupt = structuredClone(args.facts);
   corrupt.functions.find(fn => fn.name === 'chosen').sourceRange.sha256 = '0'.repeat(64);
   assert.ok(schemaErrors('raw-facts', corrupt).some(error => error.path.endsWith('/sourceRange')));
-  assert.equal(buildQuestion({ ...args, facts: corrupt, symbol: 'chosen' }).calls.reason, 'function-range-unavailable');
+  assert.equal(readEntry({ ...args, facts: corrupt, symbol: 'chosen' }).calls.reason, 'function-range-unavailable');
   const missing = structuredClone(args.facts);
   delete missing.functions[0].sourceRange;
   assert.ok(schemaErrors('raw-facts', missing).some(error => error.path === '/functions/0/sourceRange'));
   fs.appendFileSync(path.join(args.root, args.entry), '\n// changed');
-  assert.equal(buildQuestion({ ...args, symbol: 'chosen' }).calls.reason, 'entry-changed');
+  assert.equal(readEntry({ ...args, symbol: 'chosen' }).calls.reason, 'entry-changed');
   const broken = fixture(t, 'class A { void chosen() { missing(); } void broken( }');
   assert.equal(broken.facts.calls.length, 0);
-  assert.equal(buildQuestion({ ...broken }).calls.reason, 'entry-parse-errors');
+  assert.equal(readEntry({ ...broken }).calls.reason, 'entry-parse-errors');
 });
 
-test('public saved Java task exposes lexical calls and historical unknown separately', t => {
+test('saved Java facts expose lexical calls and historical unknown separately', t => {
   const args = fixture(t, 'class A { static void helper() {} void chosen() { helper(); missing(); } }');
-  const analysis = path.join(args.root, 'saved'); fs.mkdirSync(analysis);
-  const factsPath = path.join(analysis, 'raw-facts.json');
-  const run = () => {
-    const result = spawnSync(process.execPath, [path.join(ARCHIFY_PACKAGE, 'bin/archify.mjs'), 'code-analysis', 'task', analysis,
-      '--question', args.question, '--entry', args.entry, '--function', 'chosen', '--root', args.root, '--format', 'json'], { encoding: 'utf8' });
-    assert.equal(result.status, 0, result.stderr);
-    return JSON.parse(result.stdout).calls;
-  };
-  fs.writeFileSync(factsPath, JSON.stringify(args.facts));
-  const current = run();
+  const current = readEntry({ ...args, symbol: 'chosen' }).calls;
   assert.equal(current.coverage, 'available'); assert.equal(current.total, 2);
   assert.deepEqual(current.records.map(record => record.targetNavigation.status), ['valid', 'unresolved']);
   delete args.facts.callModel; args.facts.calls = [];
-  fs.writeFileSync(factsPath, JSON.stringify(args.facts));
-  const old = run(); assert.equal(old.coverage, 'unavailable'); assert.equal(old.total, null);
+  const old = readEntry({ ...args, symbol: 'chosen' }).calls; assert.equal(old.coverage, 'unavailable'); assert.equal(old.total, null);
 });
 
 
 test('Java multiline CRLF invocation ranges and declaration hashes preserve original source positions', t => {
   const source = ['class A {', ' static void helper(int x) {}', ' void chosen() {', '  String label = "😀"; helper(', '   1', '  );', ' }', '}'].join('\r\n');
   const args = fixture(t, source);
-  const calls = buildQuestion({ ...args, symbol: 'chosen' }).calls;
+  const calls = readEntry({ ...args, symbol: 'chosen' }).calls;
   assert.equal(calls.total, 1);
   assert.deepEqual(calls.selection.range, { line: 3, column: 2, endLine: 7, endColumn: 3 });
   const call = calls.records[0];

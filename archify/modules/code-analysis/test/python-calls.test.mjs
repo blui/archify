@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 const base = process.env.ARCHIFY_CALL_TEST_MODULE;
 const load = relative => import(base ? pathToFileURL(path.join(base, relative)) : new URL(`../${relative}`, import.meta.url));
 const { extractFacts } = await load('lib/analysis.mjs');
-const { buildQuestion } = await load('lib/explain.mjs');
+const { readEntry } = await load('test/entry-reader.mjs');
 const { schemaErrors } = await load('extract/shared/schema.mjs');
 function fixture(t, files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-python-calls-'));
@@ -17,9 +17,9 @@ function fixture(t, files) {
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.writeFileSync(path.join(root, file), text);
   }
-  return { root, facts: extractFacts(root, { language: 'py' }).facts, entry: 'entry.py', question: 'Where is the source definition?' };
+  return { root, facts: extractFacts(root, { language: 'py' }).facts, entry: 'entry.py' };
 }
-const selected = args => buildQuestion({ ...args, symbol: 'chosen' }).calls;
+const selected = args => readEntry({ ...args, symbol: 'chosen' }).calls;
 
 test('Python BOM decoding keeps fresh entry and imported target coordinates aligned', t => {
   const args = fixture(t, { 'entry.py': '\ufefffrom helper import work\ndef chosen(): return work()\n', 'helper.py': '\ufeffdef work(): return 1\n' });
@@ -38,7 +38,7 @@ test('Python call inventory, direct alias targets, async definition and known ze
   assert.deepEqual(calls.records.map(r => r.fact.resolution), ['same-file-function', 'imported-function', 'same-file-function', ...Array(3).fill('unresolved')]);
   assert.deepEqual(calls.records[1].targetNavigation.location, { file: 'helper.py', name: 'work', line: 1, column: 1 });
   assert.ok(calls.records.every(r => JSON.stringify(r.fact) === JSON.stringify(args.facts.calls[r.factIndex])));
-  const zero = buildQuestion({ ...args, symbol: 'local' }).calls; assert.equal(zero.coverage, 'available'); assert.equal(zero.total, 0);
+  const zero = readEntry({ ...args, symbol: 'local' }).calls; assert.equal(zero.coverage, 'available'); assert.equal(zero.total, 0);
 });
 
 test('Python unsupported/rebound/conditional/decorated/long-reexport/class targets stay inventoried', t => {
@@ -90,7 +90,7 @@ def annotated(x: helper()): pass
   const calls = new Map(args.facts.calls.map(c => [c.line, c]));
   for (const line of [4, 9, 13, 16]) assert.equal(calls.get(line).resolution, 'unresolved', `line ${line}`);
   for (const line of [5, 6, 7, 11, 14, 15]) assert.equal(calls.get(line).resolution, 'same-file-function', `line ${line}`);
-  assert.equal(buildQuestion({ ...args, symbol: 'nested' }).calls.total, 1);
+  assert.equal(readEntry({ ...args, symbol: 'nested' }).calls.total, 1);
 });
 
 test('Python scope bindings are collected before resolving parameter/store/import/catch/match/walrus/nonlocal uses', t => {
@@ -161,9 +161,9 @@ test('Python old/unknown/spoofed call models and parse failures cannot claim kno
     args.facts.callModel = model; assert.equal(selected(args).coverage, 'unavailable'); assert.equal(selected(args).total, null);
   }
   args.facts.callModel = 'python-lexical-v1'; args.facts.repository.language = 'java'; args.facts.repository.adapter = 'java-parser@3';
-  const { questionCalls } = await load('lib/question-calls.mjs');
-  assert.equal(questionCalls({ facts: args.facts, entry: { file: 'entry.py', factsStatus: 'valid', parseErrors: [] } }).coverage, 'unavailable');
-  const broken = fixture(t, { 'entry.py': 'def chosen(:\n    missing()\n' }); assert.deepEqual(broken.facts.calls, []); assert.equal(buildQuestion(broken).calls.reason, 'entry-parse-errors');
+  const { readCalls } = await load('lib/call-reader.mjs');
+  assert.equal(readCalls({ facts: args.facts, entry: { file: 'entry.py', factsStatus: 'valid', parseErrors: [] } }).coverage, 'unavailable');
+  const broken = fixture(t, { 'entry.py': 'def chosen(:\n    missing()\n' }); assert.deepEqual(broken.facts.calls, []); assert.equal(readEntry(broken).calls.reason, 'entry-parse-errors');
 });
 
 test('Python definition ranges exclude decorator calls but include physically contained defaults and nested source', t => {

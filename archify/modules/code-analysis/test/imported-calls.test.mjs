@@ -5,8 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { extractFacts, loadConfig } from '../lib/analysis.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
-import { captureChangeSide, buildChangeQuestion } from '../lib/change-question.mjs';
+import { readEntry } from './entry-reader.mjs';
 
 function fixture(t, sources, exclude = []) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-import-calls-'));
@@ -16,7 +15,7 @@ function fixture(t, sources, exclude = []) {
     fs.writeFileSync(path.join(root, file), text);
   }
   const config = loadConfig(null); config.exclude.push(...exclude);
-  return { root, facts: extractFacts(root, { language: 'ts', config }).facts, config, entry: 'entry.mjs', symbol: 'chosen', question: 'Where is this imported helper defined?' };
+  return { root, facts: extractFacts(root, { language: 'ts', config }).facts, config, entry: 'entry.mjs', symbol: 'chosen' };
 }
 
 test('relative named import aliases bind direct exported declarations and const initializers using checker identity', (t) => {
@@ -33,7 +32,7 @@ test('relative named import aliases bind direct exported declarations and const 
   assert.equal(calls.find((c) => c.line === 3).resolution, 'unresolved');
   assert.equal(calls.find((c) => c.line === 4).resolution, 'same-file-function-initializer');
   assert.deepEqual(schemaErrors('raw-facts', args.facts), []);
-  const brief = buildQuestion(args);
+  const brief = readEntry(args);
   assert.equal(brief.calls.total, 3);
   assert.ok(brief.calls.records.every((r) => r.targetNavigation.status === 'valid' && r.targetNavigation.location.file === 'target.mjs'));
 });
@@ -62,7 +61,7 @@ test('relative default imports bind direct named, anonymous and overloaded funct
   assert.equal(calls.find((c) => c.line === 5).resolution, 'unresolved');
   assert.equal(calls.find((c) => c.line === 6).resolution, 'same-file-function-initializer');
   assert.deepEqual(schemaErrors('raw-facts', args.facts), []);
-  const brief = buildQuestion({ ...args, entry: 'entry.ts' });
+  const brief = readEntry({ ...args, entry: 'entry.ts' });
   assert.equal(brief.calls.total, 4);
   assert.ok(brief.calls.records.every((r) => r.targetNavigation.status === 'valid'));
 });
@@ -153,31 +152,31 @@ test('excluded, missing, syntactically broken and ambiguous export targets canno
 
 test('target freshness independently disables navigation, keeps captured evidence and recovers after extraction', (t) => {
   const args = fixture(t, { 'entry.mjs': 'import { helper } from "./target.mjs";\nfunction chosen() { helper(); }', 'target.mjs': 'export function helper() {}' });
-  const before = buildQuestion(args).calls.records[0];
+  const before = readEntry(args).calls.records[0];
   assert.equal(before.targetNavigation.status, 'valid');
   fs.writeFileSync(path.join(args.root, 'target.mjs'), '\nexport function helper() { return 1; }');
-  let brief = buildQuestion(args); let record = brief.calls.records[0];
+  let brief = readEntry(args); let record = brief.calls.records[0];
   assert.equal(brief.entry.factsStatus, 'valid');
   assert.deepEqual(record.fact, before.fact);
   assert.equal(record.targetNavigation.status, 'changed'); assert.equal(record.targetNavigation.location, null);
   const refreshed = extractFacts(args.root, { language: 'ts' }).facts;
-  record = buildQuestion({ ...args, facts: refreshed }).calls.records[0];
+  record = readEntry({ ...args, facts: refreshed }).calls.records[0];
   assert.equal(record.targetNavigation.status, 'valid'); assert.equal(record.targetNavigation.location.line, 2);
   fs.unlinkSync(path.join(args.root, 'target.mjs'));
-  record = buildQuestion({ ...args, facts: refreshed }).calls.records[0];
+  record = readEntry({ ...args, facts: refreshed }).calls.records[0];
   assert.equal(record.targetNavigation.status, 'missing'); assert.equal(record.targetNavigation.location, null);
   fs.writeFileSync(path.join(args.root, 'target.mjs'), 'export function helper( {');
   const broken = extractFacts(args.root, { language: 'ts' }).facts;
-  assert.equal(buildQuestion({ ...args, facts: broken }).calls.records[0].targetNavigation.status, 'unresolved');
+  assert.equal(readEntry({ ...args, facts: broken }).calls.records[0].targetNavigation.status, 'unresolved');
 });
 
 test('captured target parse errors or missing source evidence never expose current navigation', (t) => {
   const args = fixture(t, { 'entry.mjs': 'import { helper } from "./target.mjs";\nfunction chosen() { helper(); }', 'target.mjs': 'export function helper() {}' });
   const broken = structuredClone(args.facts); broken.parse_errors = [{ path: 'target.mjs', message: 'captured parse failure' }];
-  let record = buildQuestion({ ...args, facts: broken }).calls.records[0];
+  let record = readEntry({ ...args, facts: broken }).calls.records[0];
   assert.equal(record.targetNavigation.status, 'parse-error'); assert.equal(record.targetNavigation.location, null);
   const absent = structuredClone(args.facts); absent.files = absent.files.filter((f) => f.path !== 'target.mjs');
-  const brief = buildQuestion({ ...args, facts: absent }); record = brief.calls.records[0];
+  const brief = readEntry({ ...args, facts: absent }); record = brief.calls.records[0];
   assert.equal(record.targetNavigation.status, 'unverifiable'); assert.equal(record.targetNavigation.location, null);
   assert.equal(brief.imports[0].target.currentStatus, 'not-checked');
 });
@@ -203,7 +202,7 @@ test('default references follow ordinary same-module functions and local default
  const imported=args.facts.calls.filter(c=>c.file==='entry.mjs'&&c.target);
  assert.deepEqual(imported.map(c=>c.target),[{file:'plain.mjs',name:'later',line:1,column:23},{file:'alias.mjs',name:'earlier',line:1,column:1}]);
  assert.equal(args.facts.calls.filter(c=>c.file==='entry.mjs'&&c.resolution==='unresolved').length,1);
- const q=buildQuestion(args);assert.equal(q.calls.bindingCoverage,'declarations-const-initializers-stable-explicit-exports-and-static-commonjs-require');assert.ok(q.calls.records.every(r=>r.targetNavigation.status==='valid'));
+ const q=readEntry(args);assert.equal(q.calls.bindingCoverage,'declarations-const-initializers-stable-explicit-exports-and-static-commonjs-require');assert.ok(q.calls.records.every(r=>r.targetNavigation.status==='valid'));
 });
 
 test('default references do not claim a function overwritten by assignments, destructuring, loops or opaque eval',t=>{
@@ -223,18 +222,15 @@ test('default-reference additions retain historical v1/v2 saved coverage without
  const args=fixture(t,{'entry.mjs':'import f from "./target.mjs";function chosen(){f();}','target.mjs':'function f(){}export default f;'});
  for(const model of ['js-ts-lexical-v1','js-ts-lexical-v2']){
   const historical=structuredClone(args.facts);historical.callModel=model;historical.calls=historical.calls.map(c=>c.file==='entry.mjs'?{file:c.file,line:c.line,column:c.column,endLine:c.endLine,endColumn:c.endColumn,resolution:'unresolved',reason:'no-local-function-binding'}:c);
-  const q=buildQuestion({...args,facts:historical});assert.equal(q.calls.coverage,'available');assert.equal(q.calls.records[0].fact.resolution,'unresolved');assert.ok(!q.calls.bindingCoverage.includes('stable-default'));
+  const q=readEntry({...args,facts:historical});assert.equal(q.calls.coverage,'available');assert.equal(q.calls.records[0].fact.resolution,'unresolved');assert.ok(!q.calls.bindingCoverage.includes('stable-default'));
  }
 });
 
 
-test('changed ordinary function default references recover foreign callers in fresh paired captures',t=>{
- const files={'entry.mjs':'import run from "./target.mjs";export function chosen(){run();}','target.mjs':'function helper(){return 1;}export default helper;'};
- const before=fixture(t,files),after=fixture(t,{...files,'target.mjs':files['target.mjs'].replace('return 1','return 2')});
- const base=captureChangeSide(before.root,before.config,'ts'),head=captureChangeSide(after.root,after.config,'ts');
- const q=buildChangeQuestion({question:'Which known references reach the changed helper?',entry:'target.mjs',base,head,config:before.config});
- const changed=q.changedDefinitions.items.find(x=>x.head?.definition.name==='helper');
- for(const side of ['base','head']){assert.equal(changed[side].knownReferences.total,1);assert.equal(changed[side].knownReferences.items[0].fact.file,'entry.mjs');assert.equal(changed[side].knownReferences.items[0].navigation.status,'valid');}
+test('ordinary function default references list the foreign caller',t=>{
+ const args=fixture(t,{'entry.mjs':'import run from "./target.mjs";export function chosen(){run();}','target.mjs':'function helper(){return 1;}export default helper;'});
+ const callers=readEntry({...args,entry:'target.mjs',symbol:'helper'}).callers;
+ assert.equal(callers.total,1);assert.equal(callers.records[0].fact.file,'entry.mjs');assert.equal(callers.records[0].origin.factsStatus,'valid');
 });
 
 
@@ -258,7 +254,7 @@ test('captured configured aliases bind ordinary exports with independent lexical
   ]);
   assert.equal(calls.find(c=>c.line===3).resolution,'unresolved');
   assert.equal(calls.find(c=>c.line===4).resolution,'same-file-function-initializer');
-  const question=buildQuestion({...args,entry:'entry.ts'});
+  const question=readEntry({...args,entry:'entry.ts'});
   assert.ok(question.calls.records.every(c=>c.targetNavigation.status==='valid'));
   assert.deepEqual(schemaErrors('raw-facts',args.facts),[]);
 });
@@ -291,20 +287,17 @@ test('configured alias reexports bind while omitted, declaration-only and type-o
   assert.ok(calls.filter(c=>c.line!==6).every(c=>c.resolution==='unresolved'));
 });
 
-test('changed configured alias target recovers the known foreign caller in each snapshot', t=>{
-  const sources={'tsconfig.json':aliasConfig,'entry.ts':'import run from "@local/target";export function chosen(){run();}','src/target.ts':'export default function helper(){return 1;}'};
-  const before=fixture(t,sources),after=fixture(t,{...sources,'src/target.ts':sources['src/target.ts'].replace('return 1','return 2')});
-  const base=captureChangeSide(before.root,before.config,'ts'),head=captureChangeSide(after.root,after.config,'ts');
-  const question=buildChangeQuestion({question:'Where is the changed helper called?',entry:'src/target.ts',base,head,config:before.config});
-  const changed=question.changedDefinitions.items.find(x=>x.head?.definition.name==='helper');
-  for(const side of ['base','head']){assert.equal(changed[side].knownReferences.total,1);assert.equal(changed[side].knownReferences.items[0].fact.file,'entry.ts');assert.equal(changed[side].knownReferences.items[0].navigation.status,'valid');}
+test('configured alias target lists the known foreign caller', t=>{
+  const args=fixture(t,{'tsconfig.json':aliasConfig,'entry.ts':'import run from "@local/target";export function chosen(){run();}','src/target.ts':'export default function helper(){return 1;}'});
+  const callers=readEntry({...args,entry:'src/target.ts',symbol:'helper'}).callers;
+  assert.equal(callers.total,1);assert.equal(callers.records[0].fact.file,'entry.ts');assert.equal(callers.records[0].origin.factsStatus,'valid');
 });
 
 
 test('historical v3 captures retain their relative-only binding coverage', t => {
   const args=fixture(t,{'entry.mjs':'import f from "./target.mjs";function chosen(){f();}','target.mjs':'function f(){}export default f;'});
   const historical=structuredClone(args.facts);historical.callModel='js-ts-lexical-v3';
-  const question=buildQuestion({...args,facts:historical});
+  const question=readEntry({...args,facts:historical});
   assert.equal(question.calls.bindingCoverage,'declarations-const-initializers-relative-imports-and-stable-default-function-references');
   assert.equal(question.calls.records[0].targetNavigation.status,'valid');
 });

@@ -170,8 +170,7 @@ and semantically invalid impl recovery unresolved. Examples are
 `path_call_multiple_trait_impl`, `query_impls_in_nearest_block`, and the
 macro call-hierarchy cases. These are recorded boundaries, not passing parity
 cases. The remaining `references.rs` cases search variables, types, imports
-and other non-call references. Archify's change question reports only captured
-direct call evidence to changed definitions.
+and other non-call references.
 
 The local regressions next to the ported tests additionally reject a wrong
 constructor-looking return type, block-local unit struct shadowing, generic

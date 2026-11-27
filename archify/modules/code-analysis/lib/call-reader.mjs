@@ -22,7 +22,7 @@ const point = (source, offset) => {
 };
 const before = (aLine, aColumn, bLine, bColumn) => aLine < bLine || (aLine === bLine && aColumn <= bColumn);
 
-export function questionCalls({ facts, factsPath, inspect, entry, location, symbol, text, selectedFunction, context = null }) {
+export function readCalls({ facts, factsPath, inspect, entry, location, symbol, text, selectedFunction, context = null }) {
   const knownAdapter = facts?.repository?.language === 'ts' && /^typescript@/.test(facts?.repository?.adapter || '');
   const pythonModel = facts?.repository?.language === 'py' && /^(?:python|pyright-parser)@/.test(facts?.repository?.adapter || '') && ['python-lexical-v1', 'python-lexical-v2', 'python-source-v1', 'python-source-v2', 'python-source-v3'].includes(facts?.callModel);
   const pythonSource = pythonModel && ['python-source-v1', 'python-source-v2', 'python-source-v3'].includes(facts.callModel);
@@ -79,7 +79,7 @@ const bindingCoverage = cppModel ? 'libclang-direct-source-definitions-visible-i
   if (goModel) result.limitations = [
     ...facts.languageScope.limitations,
     ['go-source-direct-v2', 'go-source-direct-v3', 'go-source-direct-v4'].includes(facts.callModel) ? 'Records inventory Go ast.CallExpr, including type conversions and nested literals. Targets follow captured free functions or compiler-selected concrete method declarations, including promoted methods, expressions and generic instances; interfaces and function variables stay unresolved. No runtime execution, nil safety, argument applicability or complete compilation is proved.' : 'Records inventory Go ast.CallExpr, including type conversions and calls in nested literals; unresolved does not establish callable identity. Targets are captured free-function declarations only; methods, interfaces and function variables are not resolved.',
-    'Locations use exact UTF-16 source ranges and hashes. Metadata freshness is checked by the question entrypoint; at most 40 call records are presented. Read languageScope for selected packages, build conditions, excluded files and incomplete typing.',
+    'Locations use exact UTF-16 source ranges and hashes. Metadata freshness is checked by the caller; at most 40 call records are presented. Read languageScope for selected packages, build conditions, excluded files and incomplete typing.',
   ];
   if (rustModel) result.limitations = [...facts.languageScope.limitations, 'Targets identify source declarations under the recorded crate/cfg profile, not compiler type attribution, general macro expansion or runtime dispatch. Records with macroEvidence come from the local macro_rules! binding visible at the callsite (including block-local shadowing) whose single argument expression is used exactly once under the active cfg; the definition location is the captured macro name. Read excluded/opaque regions before interpreting absent callers.'];
   if (cppModel) result.limitations = [...facts.languageScope.limitations, 'Calls are collected from the selected translation-unit context. Bound targets are ordinary source definitions visible in that unit; runtime dispatch and cross-unit linkage are not inferred. The compilation database must remain byte-for-byte unchanged for saved navigation.'];
@@ -132,7 +132,7 @@ const bindingCoverage = cppModel ? 'libclang-direct-source-definitions-visible-i
     return [{ factIndex, fact }];
   }).sort((a, b) => a.fact.line - b.fact.line || a.fact.column - b.fact.column
     || a.fact.endLine - b.fact.endLine || a.fact.endColumn - b.fact.endColumn || a.factIndex - b.factIndex);
-  const navigate = questionCallNavigator({ facts, inspect, entry, capturedRangeModel });
+  const navigate = callNavigator({ facts, inspect, entry, capturedRangeModel });
   const included = records.slice(0, LIMIT).map(navigate);
   return { ...result, coverage: 'available', selection: { ...result.selection, range },
     total: records.length, included: Math.min(records.length, LIMIT), omitted: Math.max(0, records.length - LIMIT), records: included };
@@ -140,7 +140,7 @@ const bindingCoverage = cppModel ? 'libclang-direct-source-definitions-visible-i
 
 // Shared by outgoing orientation and reverse lookup; it verifies source
 // evidence, not runtime execution or a fresh whole-project resolution.
-export function questionCallNavigator({ facts, inspect, entry, capturedRangeModel }) {
+export function callNavigator({ facts, inspect, entry, capturedRangeModel }) {
   const capturedFiles = new Set(facts.files.map((file) => file.path));
   const capturedTexts = capturedRangeModel ? new Map(facts.files.map(file => [file.path, file.sourceText])) : null;
   return record => {

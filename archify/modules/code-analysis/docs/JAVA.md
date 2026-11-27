@@ -307,8 +307,6 @@ the enclosing method context. Java function measurements include exact UTF-16
 This is source reading assistance, not Java compiler attribution: argument type
 applicability, compilation, virtual dispatch, reflection, provider selection and
 execution are unmodeled. All other invocation sites stay explicit unknowns.
-Saved question tasks expose these bounds and gate target navigation on captured
-source freshness; see [function analysis](FUNCTION-ANALYSIS.md).
 
 ## Parser choice and boundaries
 

@@ -22,17 +22,6 @@ The server serves the diagram on a loopback address with a Code Analysis button.
 
 `archify code-analysis task` (`bin/task.mjs`) builds an AI optimization task from a finished run's `findings.json` and `raw-facts.json` (`lib/task.mjs`) and optionally checks its evidence against the working tree (`lib/evidence.mjs`).
 
-With `--question`, it instead prepares single-entry source orientation without requiring a finding (`lib/explain.mjs`, `lib/question-calls.mjs`). This mode checks captured source identity, direct imports and supported call locations, then points to the host Agent's [function analysis workflow](docs/FUNCTION-ANALYSIS.md). It does not run semantic analysis or execute the analyzed project.
-
-With `--base-root`, the question path freshly captures both JS/TS roots with the
-current extractor and one analysis configuration (`lib/change-question.mjs`). An
-optional extraction observer exposes effective compiler options and resolution
-reads for comparison and freshness checks; raw facts and revision 9 are unchanged.
-The required entry selects function text/position pairs, lexical call references
-and separate module-import reading locations. Declaration coverage remains explicit.
-Neither text pairing nor references prove runtime impact. This path does not save
-a raw-facts directory, infer renames or choose changed entries automatically.
-
 ## Analysis pipeline
 
 `lib/analysis.mjs` provides the three data stages and `overlay/page.mjs` runs them and adds the fourth for a delivered page:

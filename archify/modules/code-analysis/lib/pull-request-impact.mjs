@@ -1,9 +1,9 @@
 // A bounded delta over existing snapshots. No extraction, project scan, package
 // execution or transitive/runtime analysis. Definition reading and reverse
-// references reuse the existing question readers.
-import { capturedDefinitions } from './change-question.mjs';
-import { questionCalls } from './question-calls.mjs';
-import { questionIncoming, indexIncoming } from './question-incoming.mjs';
+// references reuse the shared call and incoming readers.
+import { capturedDefinitions } from './captured-definitions.mjs';
+import { readCalls } from './call-reader.mjs';
+import { readIncoming, indexIncoming } from './incoming-reader.mjs';
 import { readInside } from './evidence.mjs';
 import { comparability } from './review.mjs';
 import { locationsOf } from './task.mjs';
@@ -40,19 +40,19 @@ function snapshotReader(facts, root) {
   };
   const fileCalls = file => {
     const entry=inspect(file);
-    if(!calls.has(file)) calls.set(file,questionCalls({facts,inspect,entry,text:files.get(file)?.sourceText,symbol:null,location:null}));
+    if(!calls.has(file)) calls.set(file,readCalls({facts,inspect,entry,text:files.get(file)?.sourceText,symbol:null,location:null}));
     return {entry,calls:calls.get(file)};
   };
   return {
     files,
     fileReferences(file) {
-      return questionIncoming({facts,inspect,...fileCalls(file),symbol:null,index});
+      return readIncoming({facts,inspect,...fileCalls(file),symbol:null,index});
     },
     references(definition) {
       const selected=fileCalls(definition.file),entry=selected.entry;
       // The exact range is from the same shared definition reader used by
-      // change-question, rather than from a name search or rebound symbol.
-      return questionIncoming({facts,inspect,entry,symbol:definition.qualname||definition.name,
+      // the impact view, rather than from a name search or rebound symbol.
+      return readIncoming({facts,inspect,entry,symbol:definition.qualname||definition.name,
         selectedFunction:definition,calls:{...selected.calls,selection:{...selected.calls.selection,range:definition}},index});
     }
   };

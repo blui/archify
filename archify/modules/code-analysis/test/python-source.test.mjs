@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { extractFacts, loadConfig, mergeConfig } from '../lib/analysis.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
+import { readEntry } from './entry-reader.mjs';
 import { parsePython } from '../extract/py/analyze.mjs';
 import { schemaErrors } from '../schemas/index.mjs';
 
@@ -167,7 +167,7 @@ def chosen(x: Derived, base: Base, diamond: Diamond):
   });
   const methods = facts.calls.filter(call => call.resolution === 'python-source-declaration');
   assert.deepEqual(methods.map(call => targetName(facts, call)), ['Base.work', 'Derived.work', 'Base.work', 'Right.work', 'Derived.work', 'Derived.work', 'create', 'Derived.work']);
-  const question = buildQuestion({ root, facts, entry: 'entry.py', symbol: 'chosen', question: 'where are its calls?' });
+  const question = readEntry({ root, facts, entry: 'entry.py', symbol: 'chosen' });
   assert.equal(question.calls.coverage, 'available');
   assert.ok(question.calls.records.filter(record => record.fact.target).every(record => record.targetNavigation.status === 'valid'));
   const spoofed = structuredClone(facts); spoofed.callModel = 'python-lexical-v2';
@@ -723,11 +723,11 @@ test('Python source declaration model still reads historical lexical captures wi
   const { root, facts } = fixture(t, { 'entry.py': 'def work(): pass\ndef chosen(): work()\n' });
   facts.repository.adapter = 'python@3.14.3'; facts.repository.adapterRevision = 10; facts.callModel = 'python-lexical-v2';
   assert.deepEqual(schemaErrors('raw-facts', facts), []);
-  const question = buildQuestion({ root, facts, entry: 'entry.py', symbol: 'chosen', question: 'where?' });
+  const question = readEntry({ root, facts, entry: 'entry.py', symbol: 'chosen' });
   assert.equal(question.calls.coverage, 'available'); assert.equal(question.calls.records[0].targetNavigation.status, 'valid');
   facts.repository.adapter = 'pyright-parser@1.1.414/python-3.14'; facts.repository.adapterRevision = 11; facts.callModel = 'python-source-v1';
   assert.deepEqual(schemaErrors('raw-facts', facts), []);
-  const historical = buildQuestion({ root, facts, entry: 'entry.py', symbol: 'chosen', question: 'where?' }).calls;
+  const historical = readEntry({ root, facts, entry: 'entry.py', symbol: 'chosen' }).calls;
   assert.equal(historical.bindingCoverage, 'captured-python-declarations-with-bounded-receiver-and-signature-types');
   assert.ok(historical.limitations.every(text => !text.includes('python-source-v2')));
 });
@@ -1002,7 +1002,7 @@ class Context:
   assert.deepEqual(Object.keys(facts.languageScope.declarations[0].files[0]).sort(), ['file', 'sha256']);
   assert.deepEqual(schemaErrors('raw-facts', facts), []);
 
-  const question = buildQuestion({ root, facts, entry: 'entry.py', symbol: 'chosen', question: 'where?' });
+  const question = readEntry({ root, facts, entry: 'entry.py', symbol: 'chosen' });
   assert.equal(question.calls.coverage, 'available');
   assert.equal(question.calls.records.filter(record => record.targetNavigation.status === 'valid').length, 2);
   const implicit = extractFacts(root, { language: 'py' }).facts;

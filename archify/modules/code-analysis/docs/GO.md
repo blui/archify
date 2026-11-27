@@ -4,8 +4,6 @@ Go support is experimental source investigation, not a project build or a comple
 
 ```sh
 node archify/bin/archify.mjs code-analysis check /path/to/module --language go --fail-on never --out /tmp/go-analysis --json
-node archify/bin/archify.mjs code-analysis task /tmp/go-analysis --root /path/to/module --entry doc/man_examples_test.go --function ExampleGenMan --question 'Where does GenMan resolve?' --format json --out /tmp/go-question.json --json
-node archify/bin/archify.mjs code-analysis task --root /path/to/after --base-root /path/to/before --entry doc/man_docs.go --question 'What known references reach this changed definition?' --format json --out /tmp/go-change.json --json
 ```
 
 The root must have a captured `go.mod` with its module directive. One run analyzes that module; nested modules, `go.work`, `replace`, external dependencies and vendor directories are not loaded. A package import is matched by the declared module path plus its directory, not by basename or directory proximity. Missing dependencies remain external/outside and do not trigger network access.

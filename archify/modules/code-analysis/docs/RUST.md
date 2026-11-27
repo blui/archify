@@ -4,11 +4,9 @@ Select the experimental Rust adapter through the normal CLI:
 
 ```sh
 node archify/bin/archify.mjs code-analysis check /path/to/workspace --language rust --fail-on never --out /tmp/rust-analysis --json
-node archify/bin/archify.mjs code-analysis task /tmp/rust-analysis --root /path/to/workspace --entry src/lib.rs --function caller --question 'Where is this function defined?' --format json --out /tmp/rust-question.json --json
-node archify/bin/archify.mjs code-analysis task --root /path/to/after --base-root /path/to/before --entry src/lib.rs --question 'Which captured direct references reach changed definitions?' --format json --out /tmp/rust-change.json --json
 ```
 
-This is source orientation. Exact function ranges, immutable captured text and hashes, definition jumps and captured direct references reuse the shared investigation output. They do not establish compilation, runtime reachability or complete change impact. Saved questions require matching Rust facts; paired questions capture both versions afresh. Configuration/metadata differences can make a paired result partial (exit 1) even when individual known references navigate correctly.
+This is source orientation. Exact function ranges, immutable captured text and hashes, definition jumps and captured direct references reuse the shared investigation output. They do not establish compilation, runtime reachability or complete change impact.
 
 ## Tooling and cost
 

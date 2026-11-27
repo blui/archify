@@ -2198,7 +2198,6 @@ const COMMAND_USAGE = {
     'drift <git-repo> --base <full-sha> --head <full-sha> --ir <architecture.json> --out <new-directory> [--map file] [--config file] [--from-report <original-drift.json>] [--locale en|zh-CN] [--json]',
     'verify-drift <original-drift.json> --task <task.json> --after <follow-up-drift.json> [--checks <checks.json> | --checks-template]',
     'task <analysis-dir> --finding <id> [--finding <id> …] [--root <repo-root>] [--command cmd] [--format md|json] [--out file] [--require-valid]',
-    'task [<analysis-dir>] --question <text> --entry <file> [--base-root <base>] --root <repo-root> [--function <name>] [--config file] [--format md|json] [--out file]',
     'task --verify <task.json> --root <repo-root> [--format md|json] [--out file] [--require-valid]',
   ],
   render: '<type> <input.json> [output.html] [--quality standard|showcase] [--repo-root path]',

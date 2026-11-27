@@ -7,8 +7,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { extractFacts, buildGraph, evaluateGraph, loadConfig, mergeConfig } from '../lib/analysis.mjs';
 import { comparability } from '../lib/review.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
-import { captureChangeSide, buildChangeQuestion } from '../lib/change-question.mjs';
+import { readEntry } from './entry-reader.mjs';
 import * as fileCycle from '../evaluate/rules/coupling/import-cycle.mjs';
 import * as moduleCycle from '../evaluate/rules/coupling/cycle.mjs';
 import { otherLanguageFiles, selectAdapter } from '../extract/index.mjs';
@@ -84,26 +83,21 @@ test('C/C++ uses exact database commands, active include contexts and frozen sou
   assert.ok(facts.calls.filter(call => call.directCaller?.name === 'macro_entry').every(call => !call.target));
   assert.ok(graph.edges.every(edge => edge.kinds.eager === 0));
   assert.ok(!findings.diagnostics.some(row => ['coupling/import-cycle', 'coupling/cycle', 'coupling/internal-leak'].includes(row.code)));
-  const question = buildQuestion({ root, facts, entry: 'a.cpp', symbol: 'alpha', question: 'Where is chosen?' });
+  const question = readEntry({ root, facts, entry: 'a.cpp', symbol: 'alpha' });
   assert.equal(question.calls.coverage, 'available');
   assert.equal(question.calls.records[0].targetNavigation.status, 'valid');
   assert.equal(question.calls.records[0].targetNavigation.location.file, 'choice.h');
-  assert.throws(() => buildQuestion({ root, facts, entry: 'choice.h', symbol: 'chosen', question: 'Who calls it?' }), error => error.diagnostics?.[0]?.code === 'task/context-required');
-  const header = buildQuestion({ root, facts, entry: 'choice.h', context: 'a.cpp', symbol: 'chosen', question: 'Who calls it?' });
+  assert.throws(() => readEntry({ root, facts, entry: 'choice.h', symbol: 'chosen' }), error => error.diagnostics?.[0]?.code === 'task/context-required');
+  const header = readEntry({ root, facts, entry: 'choice.h', context: 'a.cpp', symbol: 'chosen' });
   assert.equal(header.callers.total, 1);
   assert.deepEqual(header.scope.translationUnit, 'a.cpp');
-  const config = mergeConfig(loadConfig(), { cpp: { compileCommands: 'compile_commands.json' } });
-  const side = captureChangeSide(root, config, 'cpp');
-  const pair = buildChangeQuestion({ question: 'What changed?', entry: 'a.cpp', base: side, head: side, config });
-  assert.equal(pair.status, 'ready');
-  assert.equal(pair.definitionCoverage.base, 'available');
   const oldScope = findings.analysis;
   database[0].arguments[2] = '-DFEATURE_B';
   writeDatabase();
   const next = capture(root);
   assert.equal(comparability(oldScope, next.findings.analysis).comparable, false);
   assert.ok(comparability(oldScope, next.findings.analysis).reasons.some(row => row.code === 'cpp-build-scope-changed'));
-  const stale = buildQuestion({ root, facts, entry: 'a.cpp', symbol: 'alpha', question: 'Where is chosen?' });
+  const stale = readEntry({ root, facts, entry: 'a.cpp', symbol: 'alpha' });
   assert.equal(stale.entry.factsStatus, 'resolution-input-changed');
   assert.equal(stale.calls.coverage, 'unavailable');
   assert.equal(capture(root, 'c').facts.languageScope.build.units.length, 1);
@@ -230,12 +224,12 @@ test('C/C++ supports captured implementation headers through saved source questi
   for (const suffix of suffixes) {
     const entry = `part.${suffix}`;
     assert.equal(facts.calls.find(call => call.directCaller?.name === `${suffix}_entry`)?.target?.file, entry);
-    const question = buildQuestion({ root, facts, entry, context: 'a.cpp', symbol: `${suffix}_answer`, question: 'Who calls it?' });
+    const question = readEntry({ root, facts, entry, context: 'a.cpp', symbol: `${suffix}_answer` });
     assert.equal(question.calls.coverage, 'available');
     assert.equal(question.callers.total, 1);
     assert.equal(question.callers.records[0].navigation.status, 'valid');
     assert.equal(question.callers.records[0].fact.directCaller.name, `${suffix}_entry`);
-    assert.throws(() => buildQuestion({ root, facts, entry, question: 'Who calls it?' }), error => error.diagnostics?.[0]?.code === 'task/context-required');
+    assert.throws(() => readEntry({ root, facts, entry }), error => error.diagnostics?.[0]?.code === 'task/context-required');
   }
 });
 
@@ -251,7 +245,7 @@ test('C/C++ captures a project header included through an external wrapper', t =
   assert.ok(facts.files.some(file => file.path === 'bridge-target.h'));
   assert.deepEqual(facts.languageScope.fileContexts['bridge-target.h'], ['a.cpp']);
   assert.equal(facts.calls.find(call => call.directCaller?.name === 'bridged_entry')?.target?.file, 'bridge-target.h');
-  const question = buildQuestion({ root, facts, entry: 'bridge-target.h', context: 'a.cpp', symbol: 'bridged_answer', question: 'Who calls it?' });
+  const question = readEntry({ root, facts, entry: 'bridge-target.h', context: 'a.cpp', symbol: 'bridged_answer' });
   assert.equal(question.callers.total, 1);
   assert.equal(question.callers.records[0].navigation.status, 'valid');
 });
@@ -303,7 +297,7 @@ test('C/C++ removes conflicting caller identities without discarding an agreed c
   assert.equal(stable.reason, 'cpp-context-dependent');
   assert.equal(stable.directCaller.name, 'stable');
   for (const context of ['a.cpp', 'b.cpp']) {
-    const question = buildQuestion({ root, facts, entry: 'names.h', context, question: 'What calls are here?' });
+    const question = readEntry({ root, facts, entry: 'names.h', context });
     assert.equal(question.calls.total, 1);
     assert.ok(!question.calls.records[0].fact.directCaller);
   }

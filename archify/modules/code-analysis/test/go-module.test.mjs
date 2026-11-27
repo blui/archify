@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { extractFacts, loadConfig, mergeConfig } from '../lib/analysis.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
+import { readEntry } from './entry-reader.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
 
 function fixture(t, moduleText, source = 'package app\nfunc Work() {}\nfunc Entry() { Work() }\n') {
@@ -34,7 +34,7 @@ test('Go SDK module parsing handles blocks, comments, quoted paths and Go escape
     assert.deepEqual(schemaErrors('raw-facts', facts), []);
     assert.equal(fs.readFileSync(path.join(root, 'go.mod'), 'utf8'), moduleText + 'require example.invalid/not-loaded v1.0.0\nreplace example.invalid/not-loaded => ../outside\n');
     assert.deepEqual(fs.readdirSync(root).sort(), ['entry.go', 'go.mod', 'lib']);
-    const question = buildQuestion({ root, facts, entry: 'entry.go', symbol: 'Entry', question: 'Where is Work?' });
+    const question = readEntry({ root, facts, entry: 'entry.go', symbol: 'Entry' });
     assert.equal(question.calls.records[0].targetNavigation.status, 'valid');
   }
 });

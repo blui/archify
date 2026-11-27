@@ -1,6 +1,6 @@
 // Reverse the captured edges. No name-only matching, source search, rebinding,
 // or runtime-dispatch inference is added by this reader.
-import { questionCallNavigator } from './question-calls.mjs';
+import { callNavigator } from './call-reader.mjs';
 
 const LIMIT = 40;
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
@@ -12,7 +12,7 @@ const bounded = (base, records, read) => ({ ...base, coverage: 'available', reas
   included: Math.min(records.length, LIMIT), omitted: Math.max(0, records.length - LIMIT), records: records.slice(0, LIMIT).map(read) });
 
 // Build once when several changed definitions ask about the same saved facts.
-// Identity and navigation rules remain those of questionIncoming below.
+// Identity and navigation rules remain those of readIncoming below.
 export function indexIncoming(facts) {
   const imports = new Map(), files = new Map(), definitions = new Map();
   const add = (map, key, record) => { const list=map.get(key)||[];list.push(record);map.set(key,list); };
@@ -25,7 +25,7 @@ export function indexIncoming(facts) {
   return { facts, imports, files, definitions };
 }
 
-export function questionIncoming({ facts, inspect, entry, symbol, selectedFunction, calls, context = null, index = null }) {
+export function readIncoming({ facts, inspect, entry, symbol, selectedFunction, calls, context = null, index = null }) {
   const base = { coverage: 'unavailable', reason: null, limit: LIMIT, total: null, included: 0, omitted: null, records: [],
     limitations: [
       'Reverse lookup covers only resolved imports and bound calls in this captured selection. Unknown, dynamic, external, excluded or uncollected paths are not a known zero or a complete impact graph.',
@@ -51,7 +51,7 @@ export function questionIncoming({ facts, inspect, entry, symbol, selectedFuncti
   const callers = bounded({ ...base, provenance: calls.provenance, bindingCoverage: calls.bindingCoverage,
     selection: { file: entry.file, kind: symbol ? 'exact-function-declaration' : 'entry-file-bound-targets', target } }, matches, record => {
     const origin = inspect(record.fact.file);
-    const navigate = questionCallNavigator({ facts, inspect, entry: origin, capturedRangeModel: facts.repository.language !== 'ts' });
+    const navigate = callNavigator({ facts, inspect, entry: origin, capturedRangeModel: facts.repository.language !== 'ts' });
     const checked = navigate(record);
     const status = sourceStatus(origin) !== 'valid' ? sourceStatus(origin) : checked.targetNavigation.status;
     const { file, line, column, endLine, endColumn } = record.fact;

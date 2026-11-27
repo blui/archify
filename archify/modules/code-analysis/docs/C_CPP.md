@@ -112,22 +112,6 @@ macros confined to an ordinary call's arguments do not hide its direct target.
 If caller identities disagree across contexts, the merged call omits
 `directCaller`; an agreed caller is retained even when the target is unknown.
 
-## Source questions
-
-Saved questions for `.c`, `.cc`, `.cpp`, `.cxx` and `.C` entries use their own
-translation unit. All captured header suffixes above are accepted as saved
-question entries. For a header, pass one of its recorded contexts:
-
-```sh
-node archify/bin/archify.mjs code-analysis task /path/to/analysis --root /path/to/project --entry include/api.h --context src/main.cpp --function chosen --question 'Who calls this definition?' --format json
-```
-
-The question checks the current entry, displayed target files and the
-compilation database digest before offering navigation. An unchanged database
-does not prove that external SDK files are unchanged. Fresh paired questions
-accept C/C++ translation-unit entries; the comparison is partial when the
-observed database or parser settings differ between roots.
-
 The full-regression CI shard installs the matching bindings and native library
 from `libclang==18.1.1` and sets `ARCHIFY_CPP_REQUIRED=1`, so the C/C++ tests fail
 when the parser is unavailable. Other local lanes may explicitly skip native

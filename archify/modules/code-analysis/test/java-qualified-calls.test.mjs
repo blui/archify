@@ -4,8 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { extractFacts, loadConfig } from '../lib/analysis.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
-import { captureChangeSide, buildChangeQuestion } from '../lib/change-question.mjs';
+import { readEntry } from './entry-reader.mjs';
 import { schemaErrors } from '../extract/shared/schema.mjs';
 
 function fixture(t, files) {
@@ -21,10 +20,10 @@ test('Java explicit imported, same-package and full class paths navigate across 
  const root=fixture(t,{'p/Api.java':api,'q/Calls.java':'package q; import p.Api; public class Calls { public void caller(){Api.run();p.Api.args("😀");} }','p/Local.java':'package p; public class Local { public void caller(){Api.run();} }'});
  const facts=capture(root);assert.equal(facts.callModel,'java-static-lexical-v5');assert.equal(facts.calls.length,3);
  assert.ok(facts.calls.every(c=>c.resolution==='java-qualified-static-method'&&c.target.file==='p/Api.java'));
- const q=buildQuestion({root,facts,entry:'q/Calls.java',symbol:'Calls.caller()',question:'Where is the implementation?'});
+ const q=readEntry({root,facts,entry:'q/Calls.java',symbol:'Calls.caller()'});
  assert.equal(q.calls.bindingCoverage,'static-source-candidates-with-captured-parents-and-declared-direct-project-dependencies');assert.ok(q.calls.records.every(r=>r.targetNavigation.status==='valid'));
  fs.appendFileSync(path.join(root,'p/Api.java'),'// changed\n');
- const stale=buildQuestion({root,facts,entry:'q/Calls.java',symbol:'Calls.caller()',question:'Still current?'});
+ const stale=readEntry({root,facts,entry:'q/Calls.java',symbol:'Calls.caller()'});
  assert.ok(stale.calls.records.every(r=>r.targetNavigation.status!=='valid'));
 });
 
@@ -55,23 +54,18 @@ test('Java qualified methods keep overload, visibility, varargs, supertype and d
  assert.ok(capture(root).calls.every(c=>!c.target));
 });
 
-test('Java paired changed definition recovers captured foreign callers and v1 stays a distinct model',t=>{
+test('Java static definitions list captured foreign callers and v1 stays a distinct model',t=>{
  const files={'p/Api.java':api,'q/Calls.java':'package q; import p.Api; public class Calls { public void call(){Api.run();Api.run();} }'};
- const root=fixture(t,files),headRoot=fixture(t,{...files,'p/Api.java':api.replace('void run(){}','void run(){int changed=1;}')});
- const config=loadConfig();const base=captureChangeSide(root,config,'java'),head=captureChangeSide(headRoot,config,'java');
- const paired=buildChangeQuestion({question:'Which known references reach this change?',entry:'p/Api.java',base,head,config});
- const changed=paired.changedDefinitions.items.find(item=>item.head?.definition.name==='run');
- for(const side of ['base','head']){
-  const refs=changed[side].knownReferences;
-  assert.equal(refs.total,2);
-  assert.ok(refs.items.every(item=>item.fact.file==='q/Calls.java'&&item.navigation.status==='valid'));
-  assert.equal(new Set(refs.items.map(item=>item.fact.column)).size,2);
- }
+ const root=fixture(t,files);const facts=capture(root);
+ const callers=readEntry({root,facts,entry:'p/Api.java',symbol:'run'}).callers;
+ assert.equal(callers.total,2);
+ assert.ok(callers.records.every(item=>item.fact.file==='q/Calls.java'&&item.origin.factsStatus==='valid'));
+ assert.equal(new Set(callers.records.map(item=>item.fact.column)).size,2);
  const historical=capture(root);historical.callModel='java-static-lexical-v1';
  assert.ok(schemaErrors('raw-facts',historical).some(e=>e.message.includes('Java v2')));
  historical.calls=historical.calls.map(({target,...call})=>({...call,resolution:'unresolved',reason:'unsupported-callee'}));
  assert.deepEqual(schemaErrors('raw-facts',historical),[]);
- const q=buildQuestion({root,facts:historical,entry:'q/Calls.java',question:'Historical coverage?'});assert.equal(q.calls.coverage,'available');assert.equal(q.calls.bindingCoverage,'top-level-class-unique-static-fixed-arity-source-candidates');
+ const q=readEntry({root,facts:historical,entry:'q/Calls.java'});assert.equal(q.calls.coverage,'available');assert.equal(q.calls.bindingCoverage,'top-level-class-unique-static-fixed-arity-source-candidates');
 });
 
 
@@ -86,7 +80,7 @@ public class Api {
  const external=facts.calls.filter(c=>c.file==='q/Calls.java');
  assert.deepEqual(external.map(c=>[c.resolution,c.target.file,c.target.line]),[['java-qualified-static-method','p/Api.java',3],['java-qualified-static-method','p/Api.java',4]]);
  const local=facts.calls.filter(c=>c.file==='p/Api.java');assert.deepEqual(local.map(c=>[c.resolution,c.target.line]),[['same-file-static-method',3],['same-file-static-method',4]]);
- const q=buildQuestion({root,facts,entry:'q/Calls.java',question:'Select by fixed argument count'});assert.ok(q.calls.records.every(r=>r.targetNavigation.status==='valid'));
+ const q=readEntry({root,facts,entry:'q/Calls.java'});assert.ok(q.calls.records.every(r=>r.targetNavigation.status==='valid'));
  const old=capture(fixture(t,{'p/Api.java':api,'q/Calls.java':'package q;import p.Api;public class Calls{public void call(){Api.run();}}'}));old.callModel='java-static-lexical-v2';assert.deepEqual(schemaErrors('raw-facts',old),[]);
 });
 
@@ -98,15 +92,6 @@ test('Java same-arity, variable-arity and unsafe caller namespaces remain unknow
  public static void local(){same("x");spread("x");}
 }`,'q/Calls.java':'package q;import p.Api;public class Calls{public void call(){Api.same("x");Api.spread("x");}}','q/Child.java':'package q;import p.Api;public class Child extends Object{public void call(){Api.choose("x");}}','q/Wildcard.java':'package q;import p.Api;import static unknown.Values.*;public class Wildcard{public void call(){Api.choose("x");}}'});
  const facts=capture(root);assert.ok(facts.calls.length>=6);assert.ok(facts.calls.every(c=>c.resolution==='unresolved'&&!c.target));
-});
-
-test('Java changed overload keeps only the references to its fixed-arity declaration',t=>{
- const files={'p/Api.java':'package p;public class Api{public static void run(String x){int marker=1;}public static void run(String x,String y){}}','q/Calls.java':'package q;import p.Api;public class Calls{public void call(){Api.run("x");Api.run("x","y");}}'};
- const root=fixture(t,files),headRoot=fixture(t,{...files,'p/Api.java':files['p/Api.java'].replace('marker=1','marker=2')});const config=loadConfig();
- const base=captureChangeSide(root,config,'java'),head=captureChangeSide(headRoot,config,'java');
- const q=buildChangeQuestion({question:'Which known callers reach the changed one-argument overload?',entry:'p/Api.java',base,head,config});
- const changed=q.changedDefinitions.items.filter(d=>d.head?.definition.name==='run');assert.equal(changed.length,1);
- for(const side of ['base','head']){const refs=changed[0][side].knownReferences;assert.equal(refs.total,1);assert.equal(refs.items[0].fact.target.name,'run');assert.equal(refs.items[0].navigation.status,'valid');}
 });
 
 test('Java captured ordinary superclass chains permit class qualifiers only without inherited value or type blockers',t=>{
@@ -135,35 +120,24 @@ test('Java captured ordinary superclass chains permit class qualifiers only with
  const old=structuredClone(facts);old.callModel='java-static-lexical-v3';
  assert.ok(schemaErrors('raw-facts',old).some(e=>String(e.message).includes('Java v4')));
 
- const q=buildQuestion({root,facts,entry:'q/Plain.java',symbol:'Plain.call()',question:'Which captured implementation does this class-qualified call reach?'});
+ const q=readEntry({root,facts,entry:'q/Plain.java',symbol:'Plain.call()'});
  assert.equal(q.calls.records[0].targetNavigation.status,'valid');
 });
 
-test('Java changed static implementation finds its captured-superclass caller on each side',t=>{
- const root=fixture(t,{'base/p/Api.java':api,'head/p/Api.java':api.replace('void run(){}','void run(){int changed=1;}')});
- for(const side of ['base','head']){
-  fs.mkdirSync(path.join(root,side,'q'),{recursive:true});
-  fs.writeFileSync(path.join(root,side,'q/Calls.java'),'package q; import p.Api; class Parent {} public class Calls extends Parent {public void caller(){Api.run();}}');
- }
- const config=loadConfig(null);
- const base=captureChangeSide(path.join(root,'base'),config,'java');
- const head=captureChangeSide(path.join(root,'head'),config,'java');
- const result=buildChangeQuestion({base,head,config,entry:'p/Api.java',question:'Where are the known callers of this changed implementation?'});
- const change=result.changedDefinitions.items.find(c=>c.head.definition.name==='run');
- assert.ok(change);
- for(const side of ['base','head']){
-  assert.equal(change[side].knownReferences.total,1);
-  assert.equal(change[side].knownReferences.items[0].fact.file,'q/Calls.java');
-  assert.equal(change[side].knownReferences.items[0].navigation.status,'valid');
- }
+test('Java static implementation lists its captured-superclass caller',t=>{
+ const root=fixture(t,{'p/Api.java':api,'q/Calls.java':'package q; import p.Api; class Parent {} public class Calls extends Parent {public void caller(){Api.run();}}'});
+ const callers=readEntry({root,facts:capture(root),entry:'p/Api.java',symbol:'run'}).callers;
+ assert.equal(callers.total,1);
+ assert.equal(callers.records[0].fact.file,'q/Calls.java');
+ assert.equal(callers.records[0].origin.factsStatus,'valid');
 });
 
 test('Java inherited qualifier navigation requires fresh ancestor source even when caller and target are unchanged',t=>{
  const root=fixture(t,{'p/Api.java':api,'q/Parent.java':'package q; public class Parent {}','q/Calls.java':'package q; import p.Api; public class Calls extends Parent {public void call(){Api.run();}}'});
- const facts=capture(root),args={root,facts,entry:'q/Calls.java',symbol:'Calls.call()',question:'Is this inherited qualifier evidence still current?'};
- assert.equal(buildQuestion(args).calls.records[0].targetNavigation.status,'valid');
+ const facts=capture(root),args={root,facts,entry:'q/Calls.java',symbol:'Calls.call()'};
+ assert.equal(readEntry(args).calls.records[0].targetNavigation.status,'valid');
  fs.writeFileSync(path.join(root,'q/Parent.java'),'package q; public class Parent {protected Object Api;}');
- const stale=buildQuestion(args).calls.records[0];
+ const stale=readEntry(args).calls.records[0];
  assert.equal(stale.targetNavigation.status,'unverifiable');
  assert.equal(stale.targetNavigation.location,null);
  assert.equal(stale.targetNavigation.reason,'qualifier-ancestry-changed');

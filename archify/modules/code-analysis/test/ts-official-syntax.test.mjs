@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { extractFacts, loadConfig } from '../lib/analysis.mjs';
-import { buildQuestion } from '../lib/explain.mjs';
+import { readEntry } from './entry-reader.mjs';
 import { SYNTAX_CASES } from './ts-official-cases.mjs';
 import { configuredProgram, officialFixture, sdkPath, ts } from './ts-official-oracle.mjs';
 
@@ -37,7 +37,7 @@ for (const observation of SYNTAX_CASES) test(`official syntax ${observation.id}`
   assert.deepEqual(sort(facts.functions.map(fn => { const r = fn.sourceRange; return [r.line, r.column, r.endLine, r.endColumn]; })), sort(functions));
   assert.deepEqual(sort(facts.calls.map(call => [call.line, call.column, call.endLine, call.endColumn])), sort(calls));
   if (observation.id.includes('bom') && !source.isDeclarationFile) {
-    const question = buildQuestion({ root, facts, entry: observation.entry, symbol: 'run', question: 'Locate the function and its calls.' });
+    const question = readEntry({ root, facts, entry: observation.entry, symbol: 'run' });
     assert.equal(question.entry.factsStatus, 'valid', 'source questions use the same decoding');
     assert.equal(question.calls.coverage, 'available');
   }
