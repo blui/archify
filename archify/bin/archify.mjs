@@ -2189,7 +2189,7 @@ function invalidProvenance(artifactPath, sidecar, reason, evidence = {}) {
 }
 
 const COMMAND_USAGE = {
-  start: '<repo-root> [--ir <architecture.json>] [--locale en|zh-CN] [--out <dir>] [--pr <URL-or-number> [--repository OWNER/REPO] | --base <commit> --head <commit>] [--scope path] [--language ts|py|java|go|rust] [--map file] [--config file] [--baseline file] [--quality standard|showcase]',
+  start: '<repo-root> [--ir <architecture.json>] [--locale en|zh-CN] [--out <dir>] [--base <commit> --head <commit>] [--scope path] [--language ts|py|java|go|rust] [--map file] [--config file] [--baseline file] [--quality standard|showcase]',
   'code-analysis': [
     'prepare <repo-root> --out <dir> [--ir <architecture.json>] [--locale en|zh-CN] [--language ts|py|java|go|rust] [--map file] [--config file] [--baseline file] [--quality standard|showcase] [--base <commit> --head <commit>] [--scope path]',
     'serve <repo-root> --out <dir> [--ir <architecture.json>] [--locale en|zh-CN] [--language ts|py|java|go|rust] [--map file] [--config file] [--baseline file] [--quality standard|showcase] [--base <commit> --head <commit>] [--scope path]',
@@ -2197,7 +2197,6 @@ const COMMAND_USAGE = {
     'verify-change <analysis-dir> --task <task.json> [--checks <checks.json> | --checks-template]',
     'drift <git-repo> --base <full-sha> --head <full-sha> --ir <architecture.json> --out <new-directory> [--map file] [--config file] [--from-report <original-drift.json>] [--locale en|zh-CN] [--json]',
     'verify-drift <original-drift.json> --task <task.json> --after <follow-up-drift.json> [--checks <checks.json> | --checks-template]',
-    'import-review <github-pr-url> --out report.json [--author login] [--json]',
     'task <analysis-dir> --finding <id> [--finding <id> …] [--root <repo-root>] [--command cmd] [--format md|json] [--out file] [--require-valid]',
     'task [<analysis-dir>] --question <text> --entry <file> [--base-root <base>] --root <repo-root> [--function <name>] [--config file] [--format md|json] [--out file]',
     'task --verify <task.json> --root <repo-root> [--format md|json] [--out file] [--require-valid]',
@@ -7114,7 +7113,7 @@ try {
       break;
     case 'start': {
       if (!args.length || args[0] === '--help' || args[0] === '-h') {
-        console.log('Usage: archify start <repo-root> [--ir <architecture.json>] [--locale en|zh-CN] [--out <dir>] [--pr <URL-or-number> [--repository OWNER/REPO] | --base <commit> --head <commit>] [--scope path] [--language ts|py|java|go|rust] [--map file] [--config file] [--baseline file] [--quality standard|showcase]');
+        console.log('Usage: archify start <repo-root> [--ir <architecture.json>] [--locale en|zh-CN] [--out <dir>] [--base <commit> --head <commit>] [--scope path] [--language ts|py|java|go|rust] [--map file] [--config file] [--baseline file] [--quality standard|showcase]');
         break;
       }
       const { startAnalysisView } = await import('../modules/code-analysis/bin/serve.mjs');
@@ -7131,9 +7130,9 @@ try {
       // serve: deliver the authored diagram, serve it, analyze on click.
       // check: headless analysis with baseline, comparison and an exit code for CI.
       // task: an AI optimization task from a finished run, with an evidence check.
-      const commands = { prepare: 'prepare.mjs', serve: 'serve.mjs', check: 'check.mjs', task: 'task.mjs', 'verify-change': 'verify-change.mjs', drift: 'drift.mjs', 'verify-drift': 'verify-drift.mjs', 'import-review': 'import-review.mjs' };
+      const commands = { prepare: 'prepare.mjs', serve: 'serve.mjs', check: 'check.mjs', task: 'task.mjs', 'verify-change': 'verify-change.mjs', drift: 'drift.mjs', 'verify-drift': 'verify-drift.mjs' };
       if (!commands[args[0]]) {
-        console.error(`archify code-analysis commands: prepare, serve, check, task, verify-change, drift, verify-drift, import-review.\n${usage()}`);
+        console.error(`archify code-analysis commands: prepare, serve, check, task, verify-change, drift, verify-drift.\n${usage()}`);
         process.exitCode = 1;
         break;
       }

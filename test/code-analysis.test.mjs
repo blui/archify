@@ -38,7 +38,7 @@ test('Code Analysis exposes the workbench, checks, task and verification command
   assert.notEqual(other.status, 0);
   const operationList = other.stderr.match(/^archify code-analysis commands: (.+)\.$/m);
   assert.ok(operationList, other.stderr);
-  for (const operation of ['prepare', 'serve', 'check', 'task', 'verify-change', 'import-review', 'drift', 'verify-drift']) {
+  for (const operation of ['prepare', 'serve', 'check', 'task', 'verify-change', 'drift', 'verify-drift']) {
     assert.ok(operationList[1].split(', ').includes(operation), operation);
   }
   const driftHelp = run(['drift', '--help']);

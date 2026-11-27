@@ -847,7 +847,6 @@ const ZH_CN = {
   " in ": "，涉及 ",
   " · rule: ": " · 规则：",
   " related": " 条关联发现",
-  "AI review": "AI 审查",
   " diagnostics": " 诊断",
   " analyzed": " 已分析",
   " file": " 文件",

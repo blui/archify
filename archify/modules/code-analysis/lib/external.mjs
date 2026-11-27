@@ -8,11 +8,10 @@ import { readInside } from './evidence.mjs';
 import { parseEslint } from '../import/eslint.mjs';
 import { parseRuff } from '../import/ruff.mjs';
 import { parseSarif } from '../import/sarif.mjs';
-import { parseGithubReview } from '../import/github-review.mjs';
 import { lineFingerprints } from '../import/fingerprints.mjs';
 import { object } from '../import/common.mjs';
 
-const PARSERS = { eslint: parseEslint, ruff: parseRuff, sarif: parseSarif, 'github-review': parseGithubReview };
+const PARSERS = { eslint: parseEslint, ruff: parseRuff, sarif: parseSarif };
 const MAX_REPORT_BYTES = 32 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const MAX_CAPTURE_BYTES = 32 * 1024 * 1024;
@@ -78,7 +77,7 @@ export function importExternal({ root, config = {}, facts = null }) {
     if (!runs.length) configError('A SARIF report with no runs cannot identify a checked source; regenerate a report containing its tool run.', source.id);
     const runKeys = new Map();
     for (const run of runs) {
-      if (source.tool && source.format !== 'github-review' && source.tool.toLowerCase() !== run.tool.toLowerCase()) {
+      if (source.tool && source.tool.toLowerCase() !== run.tool.toLowerCase()) {
         fail('external/tool-mismatch', `Expected ${source.tool}, but the report identifies ${run.tool}.`, { subject: { sourceId: source.id }, supportedFixes: ['select the correct report or update the expected tool in config.external.sources'] });
       }
       if (manifest?.toolVersion && run.version && manifest.toolVersion !== run.version) configError('The manifest tool version conflicts with the report tool version.', source.id);
@@ -139,9 +138,8 @@ export function importExternal({ root, config = {}, facts = null }) {
       let binding = bindingFor(allFiles);
       if (!allFiles.length && manifest?.scope?.complete && manifest.scope.files.length === 0 && object(manifest.files)) binding = 'verified';
       const tool = run.tool;
-      const ai = source.format === 'github-review';
-      const code = `${ai ? 'external' : 'conventions'}/${toolSlug(tool)}`;
-      const severityPolicy = ai ? 'warning' : settings.severity || 'warning';
+      const code = `conventions/${toolSlug(tool)}`;
+      const severityPolicy = settings.severity || 'warning';
       const importSettingsDigest = sha256(JSON.stringify({ format: source.format, tool, severityPolicy, pathBase: source.pathBase || '.', pathMappings: source.pathMappings || [], author: source.author || null }));
       const sourceHashEntries = [], sourceTextHashEntries = [];
       for (const [file, assertions] of evidenceHashes) {
@@ -190,8 +188,8 @@ export function importExternal({ root, config = {}, facts = null }) {
         const identity = JSON.stringify([sourceId, ...(component ? [component.identityAmbiguous ? [component.name, component.index] : component.guid || component.name] : []), record.ruleId, locations.map(l => l.file), anchor]);
         const ordinal = (identityCounts.get(identity) || 0) + 1;
         identityCounts.set(identity, ordinal);
-        const id = `${ai ? 'EXT' : 'CONV'}-${sha256(`${identity}:${ordinal}`).slice(0, 12)}`;
-        const severity = severityPolicy === 'warning' ? (record.severity === 'info' && !ai ? 'info' : 'warning') : record.severity;
+        const id = `CONV-${sha256(`${identity}:${ordinal}`).slice(0, 12)}`;
+        const severity = severityPolicy === 'warning' ? (record.severity === 'info' ? 'info' : 'warning') : record.severity;
         const primary = { ...(locations.find(loc => loc.role !== 'related') || {}) };
         delete primary.role;
         // Keep a comparison-only anchor separate from finding IDs and approval digests.
@@ -226,7 +224,7 @@ export function importExternal({ root, config = {}, facts = null }) {
           ? { files, sha256: sha256(JSON.stringify(files.map(file => [file, sha256(sourceText(file).text)]))) } : null;
         diagnostics.push({
           id, code,
-          dimension: ai ? 'external-review' : 'conventions', severity, confidence: null,
+          dimension: 'conventions', severity, confidence: null,
           message: record.message, subject: { ...primary, ...(locations.length > 1 || locations.some(loc => loc.role === 'related') ? { locations } : {}) },
           evidence: { sourceId, reportPointer: record.pointer }, supportedFixes: record.suggestions,
           external, ...(evidenceDigest ? { evidenceDigest } : {}),

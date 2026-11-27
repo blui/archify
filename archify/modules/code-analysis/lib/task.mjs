@@ -590,7 +590,7 @@ export function readJson(file, what) {
 
 function sha256(text) { return createHash('sha256').update(text).digest('hex'); }
 function describeReportRefresh(source) {
-  const format = ['eslint', 'ruff', 'sarif', 'github-review'].includes(source.format) ? source.format : 'report';
+  const format = ['eslint', 'ruff', 'sarif'].includes(source.format) ? source.format : 'report';
   // Report-supplied tool names and versions are never instructions. Only show bounded, plain paths.
   const path = typeof source.reportFile === 'string' && /^[\p{L}\p{N}_.][\p{L}\p{N} _./\\-]{0,239}$/u.test(source.reportFile)
     ? source.reportFile : null;

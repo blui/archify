@@ -1,15 +1,10 @@
 # Code Analysis Quick Start
 
-An explicitly requested GitHub PR uses the same workbench:
+A pinned comparison of two local commits uses the same workbench. See [Offline review of two local commits](#offline-review-of-two-local-commits) for the command.
 
-```sh
-node bin/archify.mjs code-analysis prepare /path/to/repo --pr https://github.com/OWNER/REPO/pull/42 --out out/pr-42 --locale zh-CN
-node bin/archify.mjs start /path/to/repo --pr 42 --repository OWNER/REPO --out out/pr-42
-```
+`--scope` selects a repository-relative directory (default: the supplied local subdirectory). Comparison mode captures the base and head as immutable Git blobs and runs the existing analyzer on both with one captured configuration and language adapter. `--language` and `--locale` retain their normal meanings. The local checkout and index are not changed; repository code, hooks and package scripts are not executed.
 
-`--scope` selects a repository-relative directory (default: the supplied local subdirectory). PR mode captures the merge-base and head as immutable Git blobs and runs the existing analyzer on both with one captured configuration and language adapter. `--language` and `--locale` retain their normal meanings. The local checkout and index are not changed; repository code, hooks and package scripts are not executed.
-
-The native workbench shows head findings, source evidence, review decisions and AI tasks. Its comparison stays against the PR merge-base; refreshing recaptures the requested PR. Failed runs preserve the last successful result. Atlas keeps before/after counts and the complexity distribution visible. Green `+` and amber `◇` mark added and changed captured objects; red dashed curves mark removed dependencies whose endpoints remain in head. Removed objects stay in the change list and open base source through the shared source pane. Source-side buttons switch between captured base and head text. Ambiguous function names are not paired. Source changes do not establish changed runtime behavior or a confirmed defect; an existing head finding is not automatically introduced by the PR. External reports retain the original binding, coverage and comparison limits; this workflow does not run an AI reviewer.
+The native workbench shows head findings, source evidence, review decisions and AI tasks. Its comparison stays against the pinned base; refreshing recaptures the same commits. Failed runs preserve the last successful result. Atlas keeps before/after counts and the complexity distribution visible. Green `+` and amber `◇` mark added and changed captured objects; red dashed curves mark removed dependencies whose endpoints remain in head. Removed objects stay in the change list and open base source through the shared source pane. Source-side buttons switch between captured base and head text. Ambiguous function names are not paired. Source changes do not establish changed runtime behavior or a confirmed defect; an existing head finding is not automatically introduced by the PR. External reports retain the original binding, coverage and comparison limits; this workflow does not run an AI reviewer.
 
 Capture snapshots remain under the chosen output directory so live tasks and review decisions can verify the pinned head even if the local checkout changes. Review acceptance uses the configured baseline and existing service authorization. Offline tasks stay labeled as captured evidence; verify the intended checkout and source revision before editing.
 

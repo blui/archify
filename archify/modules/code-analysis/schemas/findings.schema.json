@@ -155,7 +155,7 @@
         "properties": {
           "id": { "type": "string", "pattern": "^[A-Z]{2,4}-(?:[0-9a-f]{12}|[0-9]{4,})$", "description": "Stable id: dimension prefix + 12 hex digits of a hash of the rule and subject. Findings written before stable ids used a position number (COUP-0001); those stay valid schema-v1 documents but their ids cannot be matched across runs." },
           "code": { "type": "string", "pattern": "^[a-z-]+/[a-z-]+$" },
-          "dimension": { "enum": ["coupling", "architecture", "complexity", "redundancy", "error-handling", "impact", "ai-smell", "conventions", "external-review"] },
+          "dimension": { "enum": ["coupling", "architecture", "complexity", "redundancy", "error-handling", "impact", "ai-smell", "conventions"] },
           "severity": { "enum": ["error", "warning", "info"] },
           "confidence": { "enum": [1, 0.7, 0.5, null] },
           "message": { "type": "string", "minLength": 1 },
@@ -225,7 +225,7 @@
       "type": "object",
       "required": ["id", "format", "tool", "toolVersion", "adapterRevision", "identityRevision", "reportSha256", "configDigest", "status", "coverage", "binding", "suppressed", "notices"],
       "properties": {
-        "id": { "type": "string", "minLength": 1 }, "code": { "type": "string", "pattern": "^[a-z-]+/[a-z-]+$" }, "format": { "enum": ["eslint", "ruff", "sarif", "github-review"] },
+        "id": { "type": "string", "minLength": 1 }, "code": { "type": "string", "pattern": "^[a-z-]+/[a-z-]+$" }, "format": { "enum": ["eslint", "ruff", "sarif"] },
         "tool": { "type": "string", "minLength": 1 }, "toolVersion": { "type": ["string", "null"] },
         "adapterRevision": { "type": "integer", "minimum": 1 }, "identityRevision": { "type": "integer", "minimum": 1 },
         "reportSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "configDigest": { "type": ["string", "null"] },

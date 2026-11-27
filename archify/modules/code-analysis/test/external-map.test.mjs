@@ -12,8 +12,8 @@ const graph = {
 const facts = { repository: graph.repository, files: Object.keys(graph.fileModules).map(path => ({ path, loc: 1, role: 'source', sourceText: 'pass\n' })), imports: [], functions: [], unresolved: {} };
 const ir = { components: ['app', 'lib'].map(id => ({ id, label: id, sources: [{ path: id === 'app' ? 'app/a.py' : 'lib/b.py' }] })) };
 const html = '<body><div class="toolbar"></div><svg><g data-node-id="app"></g><g data-node-id="lib"></g></svg></body>';
-function finding({ id = 'CONV-aaaaaaaaaaaa', file = 'app/a.py', severity = 'error', ai = false, locations = [{ file, line: 1 }] } = {}) {
-  return { id, code: ai ? 'external/coderabbit' : 'conventions/ruff', dimension: ai ? 'external-review' : 'conventions', confidence: null, severity, message: 'Source diagnostic', subject: { file, line: 1 }, evidence: {}, supportedFixes: [], external: { sourceId: ai ? 'review' : 'lint', tool: ai ? 'CodeRabbit' : 'Ruff', ruleId: ai ? null : 'F821', locations } };
+function finding({ id = 'CONV-aaaaaaaaaaaa', file = 'app/a.py', severity = 'error', locations = [{ file, line: 1 }] } = {}) {
+  return { id, code: 'conventions/ruff', dimension: 'conventions', confidence: null, severity, message: 'Source diagnostic', subject: { file, line: 1 }, evidence: {}, supportedFixes: [], external: { sourceId: 'lint', tool: 'Ruff', ruleId: 'F821', locations } };
 }
 function overlay(findings, statuses = {}) {
   const result = buildOverlay({ ir, graph, facts, findings, html, run: { review: { findings: Object.fromEntries(Object.entries(statuses).map(([id, status]) => [id, { status, reason: 'Reviewed source behavior' }])) } } });
@@ -22,15 +22,12 @@ function overlay(findings, statuses = {}) {
 
 test('external map: source findings drive component severity and discoverable indicator ids', () => {
   const lint = finding();
-  const review = finding({ id: 'EXT-bbbbbbbbbbbb', ai: true, severity: 'warning' });
-  const data = overlay([lint, review]);
+  const data = overlay([lint]);
   const app = data.components.find(component => component.id === 'app');
   assert.equal(app.indicators.status, 'red');
   assert.deepEqual(app.indicators.items.find(item => item.key === 'conventions').findings, [lint.id]);
   assert.equal(app.indicators.items.find(item => item.key === 'conventions').status, 'red');
-  assert.deepEqual(app.indicators.items.find(item => item.key === 'external-review').findings, [review.id]);
-  assert.equal(app.indicators.items.find(item => item.key === 'external-review').status, 'amber');
-  assert.deepEqual(app.findings.map(item => item.id), [lint.id, review.id]);
+  assert.deepEqual(app.findings.map(item => item.id), [lint.id]);
   assert.equal(data.components.find(component => component.id === 'lib').indicators.status, 'green');
 });
 

@@ -60,9 +60,6 @@ test('external lint defaults to a warning cap while source severity and explicit
     assert.equal(result.diagnostics[0].severity, severity);
     assert.equal(result.diagnostics[0].external.originalSeverity, severity);
   }
-  const review = w.load('github-review', [{ id: 1, body: 'Review claim', path: 'a.py' }], { severity: 'source' });
-  assert.equal(review.diagnostics[0].severity, 'warning');
-  assert.equal(review.sources[0].severityPolicy, 'warning');
 });
 
 test('ESLint metadata keeps original rule, message, explicit source severity, links and source suppressions', t => {
@@ -231,26 +228,6 @@ test('SARIF resolves runs, ruleIndex, message templates, URI bases and source su
   assert.equal(result.sources.find(s => s.tool === 'Other').status, 'partial');
   const reordered = w.load('sarif', { ...report, runs: [...report.runs].reverse() }, { source: { pathMappings: [{ from: '/ci/work', to: '.' }] } });
   assert.equal(reordered.diagnostics[0].id, d.id);
-});
-
-test('GitHub review imports preserve old diff coordinates and replies without claiming current source evidence', t => {
-  const w = workspace(t, { 'app.py': 'pass\n' });
-  const head = 'a'.repeat(40);
-  const comment = { id: 42, body: 'Review this intentional behavior', path: 'app.py', side: 'LEFT', line: null, original_line: 17, commit_id: 'b'.repeat(40), original_commit_id: 'b'.repeat(40), html_url: 'https://github.com/example/repo/pull/1#discussion_r42', user: { login: 'coderabbitai[bot]' } };
-  const report = { headCommit: head, author: 'coderabbitai[bot]', comments: [comment, { id: 43, in_reply_to_id: 42, body: 'Retained intentionally', user: { login: 'maintainer' } }, { id: 44, body: 'Another reviewer', user: { login: 'human' } }] };
-  const facts = { repository: { baseRevision: head }, files: [] };
-  const result = w.load('github-review', report, { source: { tool: 'CodeRabbit' }, facts });
-  assert.equal(result.diagnostics.length, 1);
-  const d = result.diagnostics[0];
-  assert.equal(d.severity, 'warning');
-  assert.equal(d.external.binding, 'unverified');
-  assert.equal(d.evidenceDigest, undefined);
-  assert.equal(d.subject.line, undefined);
-  assert.equal(d.external.origin.originalLine, 17);
-  assert.equal(d.external.origin.replies[0].body, 'Retained intentionally');
-  const updated = w.load('github-review', { ...report, comments: [{ ...comment, body: 'Updated review claim' }] }, { source: { tool: 'CodeRabbit' }, facts }).diagnostics[0];
-  assert.equal(updated.id, d.id);
-  assert.notEqual(updated.external.reviewDigest, d.external.reviewDigest);
 });
 
 test('CodeQL line-hash adaptation retains upstream reference vectors and newline equivalence', () => {

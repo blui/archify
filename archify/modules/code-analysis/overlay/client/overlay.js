@@ -354,7 +354,7 @@
     var findings = (indicator.findings || []).map(function (id) { return findingById[id]; }).filter(Boolean);
     if (indicator.key === 'cycle') return findings.length ? tr('{count} recorded cycles; inspect source evidence. Runtime failure is unverified.', { count: findings.length }) : tr('No recorded cycle; runtime behavior is unverified.');
     if (indicator.key === 'instability') return indicator.instability == null ? tr('No edges') : tr('{value} · fan-in {incoming} / fan-out {outgoing}', { value: indicator.instability, incoming: indicator.fanIn, outgoing: indicator.fanOut });
-    if (indicator.key === 'conventions' || indicator.key === 'external-review') return tr('{count} findings from {tools}', { count: findings.length, tools: [...new Set(findings.map(function (f) { return f.external.tool; }))].join(', ') });
+    if (indicator.key === 'conventions') return tr('{count} findings from {tools}', { count: findings.length, tools: [...new Set(findings.map(function (f) { return f.external.tool; }))].join(', ') });
     return findings.length ? findings.map(findingWhat).join('；') : tr(indicator.value);
   }
   function show(id) {
@@ -685,7 +685,7 @@
     var tone = toneOf(f.severity), label = tr(f.severity), mark = { red: '×', amber: '!', blue: 'i' }[tone];
     return '<article class="priority-card">' + findingRow(id, n) + '<span class="priority-level ' + tone + '" tabindex="0" role="img" aria-label="' + esc(label + ': ' + LEVELS[tone].text) + '" data-analysis-tip="' + esc(label + ': ' + LEVELS[tone].text) + '">' + mark + '</span>' + quickHandoff(f, true) + taskHtml(f) + '</article>';
   }
-  var CATEGORIES = { coupling: tr("Dependencies"), complexity: tr("Complexity"), redundancy: tr("Duplicate code"), architecture: tr("Architecture"), conventions: tr("Coding conventions"), 'external-review': tr("AI review") };
+  var CATEGORIES = { coupling: tr("Dependencies"), complexity: tr("Complexity"), redundancy: tr("Duplicate code"), architecture: tr("Architecture"), conventions: tr("Coding conventions") };
   function externalSources() { return (data.overview && data.overview.coverage && data.overview.coverage.external) || []; }
   externalSources().forEach(function (source) { GROUPS[source.code] = source.tool + tr(" diagnostics"); });
   function sourceLabel(source) { var version = source.toolVersion || ''; if (version.toLowerCase().startsWith(source.tool.toLowerCase() + ' ')) version = version.slice(source.tool.length + 1); return source.tool + (version ? ' ' + version : '') + ' · ' + source.id; }

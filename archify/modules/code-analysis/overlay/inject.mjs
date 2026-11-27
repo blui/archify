@@ -260,8 +260,7 @@ function indicators(set, mods, findings, owner, filePaths) {
     .sort((a, b) => b.evidence.complexity - a.evidence.complexity || b.evidence.nesting - a.evidence.nesting);
   const imported = findings.filter(f => f.external && findingFiles(f).some(file => filePaths.has(file)));
   const externalItems = [
-    ['conventions', 'Project conventions', imported.filter(f => f.dimension !== 'external-review')],
-    ['external-review', 'External review', imported.filter(f => f.dimension === 'external-review')],
+    ['conventions', 'Project conventions', imported],
   ].filter(([, , group]) => group.length).map(([key, label, group]) => ({
     key, label,
     status: { error: 'red', warning: 'amber', info: 'blue' }[['error', 'warning', 'info'].find(severity => group.some(f => f.severity === severity))],

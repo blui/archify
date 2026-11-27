@@ -1,10 +1,10 @@
 # External diagnostics (C7)
 
-Code Analysis can import existing ESLint JSON, Ruff JSON, SARIF 2.1.0 and saved GitHub review comments. The imported findings retain their original tool, rule, message, severity and positions, and use the existing task, evidence, baseline and comparison pipeline.
+Code Analysis can import existing ESLint JSON, Ruff JSON and SARIF 2.1.0. The imported findings retain their original tool, rule, message, severity and positions, and use the existing task, evidence, baseline and comparison pipeline.
 
 The local viewer includes a searchable findings list, source and coverage details, source evidence, AI task preview/export and baseline review decisions. The CLI and viewer read the same configured reports and use the same evidence and review lifecycle.
 
-Import reads reports; it does not execute ESLint, Ruff, project scripts, suggested fixes or an AI reviewer. Regenerating an external report remains a separate project or CI step.
+Import reads reports; it does not execute ESLint, Ruff, project scripts or suggested fixes. Regenerating an external report remains a separate project or CI step.
 
 ## Import existing reports
 
@@ -36,17 +36,16 @@ Viewer source choices include this id alongside the tool/version, so reports fro
 | Source option | Meaning |
 |---|---|
 | `id` | Required stable source identity; letters, digits, underscore, dot, colon and hyphen are supported. |
-| `format` | Required: `eslint`, `ruff`, `sarif` or `github-review`. |
+| `format` | Required: `eslint`, `ruff` or `sarif`. |
 | `file` | Required report path, resolved relative to the analyzed repository root. |
 | `pathBase` | Optional base for relative paths reported by the producer, relative to the analyzed root; defaults to `.`. |
 | `pathMappings` | Optional explicit producer-root mappings, such as `[{"from":"C:/agent/repo","to":"."}]`. The longest matching root wins; filenames are never matched by basename. |
 | `tool` | Optional display name override. The source tool's original rule identifier is stored separately from Archify's rule code. |
 | `manifest` | Optional generation-time manifest object or a JSON file path relative to the analyzed root. |
-| `author` | For `github-review`, select root review comments by GitHub login. Replies by other authors remain discussion context. |
 
 For example, `pathBase: "packages/web"` maps a native report's `src/index.ts` to `packages/web/src/index.ts`. Manifest `scope.files` and `files` keys always name repository-relative paths; `pathBase` is not applied to them. Absolute CI paths outside the local root require an explicit `pathMappings` entry. Source paths resolving outside the root, symlink escapes and non-file URLs do not supply source evidence.
 
-Omitting `external.severity` uses the default `"warning"` policy: imported lint errors are capped at warning, warnings stay warning and info stays info. The source value remains in `external.originalSeverity`. AI review comments are always warning. A report without a source severity uses warning and records that default; the original missing value remains visible. External `confidence` is unknown (`null`), not a new Archify quality score.
+Omitting `external.severity` uses the default `"warning"` policy: imported lint errors are capped at warning, warnings stay warning and info stays info. The source value remains in `external.originalSeverity`. A report without a source severity uses warning and records that default; the original missing value remains visible. External `confidence` is unknown (`null`), not a new Archify quality score.
 
 Set `external.severity: "source"` explicitly to preserve the normalized source error/warning/info levels. Open source-mode errors can make a component red and fail `--fail-on error`; this mode does not establish a confirmed structural or runtime defect.
 
@@ -59,7 +58,6 @@ The CLI's default threshold remains `--fail-on warning`. Capping an imported err
 | `eslint` | The native JSON result array, or `json-with-metadata` with `results` and `metadata.rulesMeta`. Keeps plugin rule ids, messages, severity, positions, documentation links and available suggestion text. Tool/parser diagnostics mark coverage incomplete. Source-suppressed messages are counted separately. |
 | `ruff` | Native JSON array, including older reports without severity and current reports with `name`/severity. Code-point columns are converted to UTF-16. Syntax errors make coverage incomplete. Notebook cell coordinates are retained as native metadata; they are not presented as line numbers in the `.ipynb` JSON file. |
 | `sarif` | A SARIF 2.1.0 log validated with the bundled official schema. Each run has its own derived source identity. See the supported subset below. |
-| `github-review` | A saved PR review-comments array or `{ "comments": [...], "headCommit": "...", "author": "..." }`. Root comments become source claims; discussion replies remain context. See collection and location limitations below. |
 
 If you need to produce a report, use the project's installed and configured tool. Typical commands are:
 
@@ -178,7 +176,7 @@ Both operations preserve unrelated baseline entries. Accept requires a non-empty
 
 External baseline entries store both the source `sha256` and a separate `externalReviewDigest` for the tool's claim/context. A changed or missing source/claim digest reopens the item as `accepted-changed`. Existing internal baselines retain their prior compatibility behavior.
 
-Earlier C7 builds used `"source"` when `external.severity` was omitted. To retain that behavior, now set `"source"` explicitly. Moving a lint source from the old source policy to the new warning default changes its import-settings and review digests, even when source bytes, finding ids and original severities are unchanged. Prior acceptances require re-review; comparisons across those policies are not directly comparable, and `--new-only` with such a previous run returns exit code 2. Review the current result and record a new reason instead of migrating acceptance silently. This policy change does not alter AI review's always-warning mapping.
+Earlier C7 builds used `"source"` when `external.severity` was omitted. To retain that behavior, now set `"source"` explicitly. Moving a lint source from the old source policy to the new warning default changes its import-settings and review digests, even when source bytes, finding ids and original severities are unchanged. Prior acceptances require re-review; comparisons across those policies are not directly comparable, and `--new-only` with such a previous run returns exit code 2. Review the current result and record a new reason instead of migrating acceptance silently.
 
 Compare fresh runs with the same `--out` directory, or name a previous `findings.json` explicitly:
 
@@ -194,37 +192,9 @@ For comparable ESLint reports, Archify first pairs a unique finding at the same 
 
 Exit codes for `check` remain 0 for the configured gate passing, 1 for open findings reaching `--fail-on`, and 2 for usage/input/analysis errors. A passing gate is not a guarantee about unconfigured or unknown coverage.
 
-## Read-only GitHub review collection
-
-The optional collector saves the PR head and paginated inline review comments:
-
-```sh
-node bin/archify.mjs code-analysis import-review https://github.com/OWNER/REPO/pull/NUMBER --author 'coderabbitai[bot]' --out /path/to/repo/reports/review.json --json
-```
-
-`GH_TOKEN` or `GITHUB_TOKEN` can provide repository/PR read access; tokens are not placed in the saved report. Collection uses GitHub GET requests only and verifies that the PR head remained unchanged before publishing its output. It does not create comments, reply, dismiss a review or invoke an AI reviewer. It currently accepts `github.com` PR URLs, not GitHub Enterprise hosts. The collector is explicit; `check` and `serve` do not call it automatically.
-
-Configure its saved output:
-
-```json
-{
-  "external": {
-    "sources": [
-      { "id": "pr-review", "format": "github-review", "file": "reports/review.json", "tool": "CodeRabbit", "author": "coderabbitai[bot]" }
-    ]
-  }
-}
-```
-
-Root review comments become warning-level source claims. Their stable comment ids, source URLs, commits, diff side, original/current native positions and discussion replies are preserved. A RIGHT-side position is considered current only when the exported head, analyzed base commit and comment commit agree and a current line is available. LEFT-side, old/outdated and file-only claims do not get fabricated current line evidence or an automatic modification scope. Unknown rule ids stay unknown.
-
-The REST review-comments endpoint does not represent every PR discussion or a complete code review. The collector does not infer thread resolution; `resolved`/`outdated` information is retained only when supplied in the input. A source comment's status is not a local baseline decision. Review collection alone also does not prove source-byte binding or complete scan coverage.
-
 ## Current bounds and provenance
 
 Reports and manifests are limited to 32 MiB each; an import is limited to 100,000 records. Supplemental source capture is limited to 2 MiB per file and 32 MiB per import. Unavailable/binary/excluded source remains unverifiable, with its source claim and notices retained. Normal code-analysis language prerequisites still apply to the selected internal extractor.
-
-The GitHub collector has a 30-second total deadline, 100-page / 10,000-comment bound and 32 MiB response/output bound. Failure leaves the previous output in place.
 
 Report binding verifies the supplied file-content assertions. It does not cover Unix permission metadata, environment-dependent tool behavior or the correctness of a tool's conclusion. A chmod-only change, for example, does not invalidate a byte-hash manifest even if it affects a source rule such as Ruff `EXE001`.
 

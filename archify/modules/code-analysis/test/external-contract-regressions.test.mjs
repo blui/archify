@@ -55,12 +55,6 @@ test('SARIF hierarchical rule IDs preserve the variant while resolving descripto
   assert.equal(imported.diagnostics[0].severity, 'warning');
 });
 
-test('GitHub author filtering does not bypass structured validation of malformed comments', (t) => {
-  const load = workspace(t);
-  assert.throws(() => load('github-review', [null], { author: 'review-bot' }),
-    (error) => error instanceof DiagnosticError && error.diagnostics[0].code === 'external/report-invalid');
-});
-
 test('manifest hash metadata is typed before hashing or being published as provenance', (t) => {
   const load = workspace(t);
   for (const fields of [
