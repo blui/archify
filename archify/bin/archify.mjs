@@ -4317,7 +4317,7 @@ async function commandExportSvg(args) {
   }
 }
 
-function reportArtifactFailure({ command, json, stage, type, input, output, error, diagnostics = [], status = 1, checker, receiptId, provenance, update }) {
+function reportArtifactFailure({ command, json, stage, type, input, output, error, diagnostics = [], status = 1, checker, receiptId, provenance }) {
   const receipt = {
     schemaVersion: 1,
     ok: false,
@@ -4331,12 +4331,10 @@ function reportArtifactFailure({ command, json, stage, type, input, output, erro
     diagnostics,
     ...(provenance ? { provenance } : {}),
     ...(checker ? { checker } : {}),
-    ...(update ? { update } : {}),
   };
   if (json) console.log(JSON.stringify(receipt, null, 2));
   else {
     console.error(formatDiagnostics(error, diagnostics));
-    if (update?.noticeRequired) console.log(update.noticeText);
   }
   process.exitCode = status;
 }
@@ -5260,7 +5258,6 @@ async function commandDeliver(args) {
         : '';
       console.log(`${receipt.validation.checksPassed}/${receipt.validation.checkCount} artifact checks; composition ${receipt.validation.compositionProfile}: ${receipt.validation.compositionStatus}${engineering}; sha256 ${receipt.artifact.sha256.slice(0, 12)}`);
       if (receipt.open?.status === 'opened') console.log(`opened ${outputPath}`);
-      if (receipt.update.noticeRequired) console.log(receipt.update.noticeText);
     }
   } finally {
     if (deliveryOwnership) {
@@ -5938,7 +5935,6 @@ async function commandFinalize(rawArgs) {
       const installNotice = offer.dependencies === 'missing' ? ' (analysis components are missing; reinstall Archify first)' : '';
       console.log(`Architecture Diagnosis available (not run)${installNotice}: ${nodeCommand(offer.start.argv.slice(1))}`);
     }
-    if (result.summary.update?.noticeRequired) console.log(result.summary.update.noticeText);
   }
   process.exitCode = result.exitCode;
 }
