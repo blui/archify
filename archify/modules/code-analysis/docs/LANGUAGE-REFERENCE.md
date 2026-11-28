@@ -64,7 +64,7 @@ captures root-module source scope, function definitions and conservative direct
 function bindings. Build selection, excluded files, parse failures and
 incomplete typing remain explicit; it does not download modules or establish a
 complete build or runtime call graph. See [Go support and limitations](GO.md)
-for toolchain selection, commands and source-question examples.
+for toolchain selection, commands and source navigation.
 
 ## Rust
 
@@ -78,7 +78,7 @@ compiles the bundled parser helper and may fetch that helper's locked
 dependencies; project build scripts and macros are not executed. Conditional
 compilation, unsupported paths, macros and unresolved dispatch retain explicit
 uncertainty. See [Rust support and limitations](RUST.md) for toolchain,
-workspace, call-model and source-question details.
+workspace and call-model details.
 
 ## C and C++
 
@@ -90,7 +90,7 @@ C and C++ require an existing compilation database, matching Python clang
 bindings and an installed libclang. The adapter captures active includes,
 source definitions and bounded direct-call navigation under each recorded
 translation-unit context. See [C/C++ support and limitations](C_CPP.md) for
-configuration, platform status, questions and unknowns.
+configuration, platform status and unknowns.
 
 ## Evidence
 

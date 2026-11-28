@@ -55,7 +55,7 @@ struct path or constructor path whose captured nominal type is unambiguous; an
 inherent declaration with the same name blocks that selection. Calls through a
 declared `T: Trait` bound, `dyn Trait`, `Trait::method` or generic path target
 the trait method declaration only (`rust-trait-method-candidate`); they prove
-trait use, not the runtime implementation. Change questions list these as
+trait use, not the runtime implementation. The comparison impact reader lists these as
 `traitCandidates` with `runtimeTarget: not-determined`, separately from direct
 references. When the selected definition is a trait method's default body, its
 trait-dispatch callsites in the declaring file are listed under direct
@@ -111,8 +111,8 @@ disagree, `directCaller` is omitted without discarding an agreed target; the mac
 and physical expansion anchors remain. If expansions disagree on the target, the top-level call is
 `unresolved` with reason `rust-context-dependent` and no `target`; the same
 `macroTemplate` provenance remains available. No per-expansion targets or
-runtime implementation identities are supplied. Saved question records retain
-this object unchanged; target navigation also checks captured definition and
+runtime implementation identities are supplied. Captured records retain
+this object unchanged, and target navigation also checks captured definition and
 expansion-file freshness. Historical v11 captures remain accepted under their
 original contract and are not retroactively assigned v12 provenance.
 
@@ -198,9 +198,9 @@ nested chains or reassigned locals, and calls that require the concrete `Self`
 inside a default body. Concrete types implementing several traits
 with the same method stay unresolved rather than selecting one. Repeated
 trait-method qualnames (same type, same method name in different traits) remain
-duplicate slots in paired questions, while their head-only traitCandidates stay
+duplicate slots in base/head comparisons, while their head-only traitCandidates stay
 inspectable. Source navigation does not infer lifetimes, borrow-check, compile,
 execute or establish complete impact. Native function sourceRange starts at
 pub/fn, while definition.sourceRange also includes owned attributes/doc comments;
-target locations use the former. Saved and paired questions retain existing
+target locations use the former. Source navigation and comparisons retain existing
 freshness and source-profile checks. Normal toolchain requirements are unchanged.

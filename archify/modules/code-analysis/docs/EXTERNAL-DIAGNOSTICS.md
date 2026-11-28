@@ -1,8 +1,8 @@
 # External diagnostics (C7)
 
-Code Analysis can import existing ESLint JSON, Ruff JSON and SARIF 2.1.0. The imported findings retain their original tool, rule, message, severity and positions, and use the existing task, evidence, baseline and comparison pipeline.
+Code Analysis can import existing ESLint JSON, Ruff JSON and SARIF 2.1.0. The imported findings retain their original tool, rule, message, severity and positions, and use the existing evidence, baseline and comparison pipeline.
 
-The local viewer includes a searchable findings list, source and coverage details, source evidence, AI task preview/export and baseline review decisions. The CLI and viewer read the same configured reports and use the same evidence and review lifecycle.
+The local viewer includes a searchable findings list, source and coverage details, source evidence and baseline review decisions. The CLI and viewer read the same configured reports and use the same evidence and review lifecycle.
 
 Import reads reports; it does not execute ESLint, Ruff, project scripts or suggested fixes. Regenerating an external report remains a separate project or CI step.
 
@@ -88,7 +88,7 @@ Multiple runs with the same tool and automation identity cannot be reliably dist
 
 ## Bind a report to its actual source
 
-Readable source captured at import time is not proof that an old report analyzed that source. A bare native JSON report generally leaves its full scan scope, effective configuration and generation-time source relationship unknown. Its findings can still be inspected and exported as tasks.
+Readable source captured at import time is not proof that an old report analyzed that source. A bare native JSON report generally leaves its full scan scope, effective configuration and generation-time source relationship unknown. Its findings can still be inspected.
 
 A producer can provide a versioned manifest containing the information it actually recorded while generating the report:
 
@@ -108,7 +108,7 @@ The angle-bracket values are placeholders, not valid digest values. Supply lower
 
 Generate the manifest from the same frozen source/configuration as the report. Creating source hashes later from an edited working tree cannot establish the report's original inputs. A matching Git HEAD alone does not prove that the working tree was clean.
 
-Manifest raw-byte hashes, SARIF artifact hashes and embedded source text are checked against their respective byte/text representations. This matters for Python encodings and BOMs. Retained raw-byte assertions appear as `analysis.external[].sourceHashes`; embedded text assertions appear separately as `analysis.external[].sourceTextHashes`. Task verification rechecks both across scanned files beyond the finding's own citation.
+Manifest raw-byte hashes, SARIF artifact hashes and embedded source text are checked against their respective byte/text representations. This matters for Python encodings and BOMs. Retained raw-byte assertions appear as `analysis.external[].sourceHashes`; embedded text assertions appear separately as `analysis.external[].sourceTextHashes`. The evidence check for review acceptance rechecks both across scanned files beyond the finding's own citation.
 
 | Recorded state | Meaning |
 |---|---|
@@ -130,33 +130,23 @@ node bin/archify.mjs code-analysis serve /path/to/repo --language ts --ir /path/
 
 Open its local URL and click **Code Analysis**. **Filter** and **External diagnostics** open the findings list. Filter by source, category, severity or review status; search by rule, message or file. The unverified-report filter includes unverified and changed source bindings. **Sources & coverage** separates successful import, report binding and declared scan completeness, including valid empty reports.
 
-Open a finding to read its original rule/message, primary and related source excerpts, position and provenance. Task preview/export uses that captured evidence; the live service checks it against current source before returning a task. Imported findings can highlight their existing file owners on the component diagram and Atlas. Supplemental evidence does not create new dependency nodes or edges.
+Open a finding to read its original rule/message, primary and related source excerpts, position and provenance. The live service checks that captured evidence against current source before it accepts the finding. Imported findings can highlight their existing file owners on the component diagram and Atlas. Supplemental evidence does not create new dependency nodes or edges.
 
 **Accept…** requires a reason. **Revoke acceptance** removes the local baseline decision. Saving rebuilds the page from the same captured facts and scan scope; it does not rerun extraction, duplicate detection or an external tool. A stale page or changed source cannot silently accept a different claim. Accepted external findings retain their configured and original severities for inspection. Default-mapped warnings stop coloring the diagram after acceptance; explicit source-mode errors follow the existing accepted-error rule and retain their red indication. If view-file publication fails after the baseline was saved, the viewer confirms the saved decision and reports the file warning while retaining the updated live page.
 
 After regenerating reports or changing source/configuration, use **Re-analyze** for a new analysis and comparison. A failed re-analysis keeps the last successful result. Add or change imported report sources in the configuration file above; the viewer reads those files rather than running the external tools.
 
-A standalone `repo.analysis.html` supports reading/filtering and captured task export. Saving review decisions, checking current source and re-analysis require the local service; static reports do not contain its authorization token.
+A standalone `repo.analysis.html` supports reading and filtering. Saving review decisions, checking current source and re-analysis require the local service; static reports do not contain its authorization token.
 
-## Evidence and AI tasks
+## Evidence
 
-Run `task` on a completed analysis directory:
-
-```sh
-node bin/archify.mjs code-analysis task /path/to/repo/.analysis --finding CONV-012345abcdef --root /path/to/repo --format json --out /path/to/repo/task.json
-```
-
-Replace the example id with one from that run's `findings.json`. The default task format is Markdown. `--require-valid` can require successful verification before returning an actionable task.
-
-External findings carry their tool, original rule/level, source id, report item reference, positions, original review metadata and report-to-source binding. Captured text beyond the selected language adapter lives in `findings.externalEvidence`. Task generation validates its hashes and combines it with the original source snapshot; it does not read arbitrary current files and label them as old evidence.
-
-Related excerpts remain in the task's read scope, while automatic modification scope requires primary evidence. Live task requests also match the claim displayed by the page; a changed message/rule context on an otherwise identical source snapshot requires refreshing the page before export. Static and CLI task exports keep their captured/current-evidence distinctions.
+External findings carry their tool, original rule/level, source id, report item reference, positions, original review metadata and report-to-source binding. Captured text beyond the selected language adapter lives in `findings.externalEvidence`. The evidence check validates its hashes and combines it with the original source snapshot. It does not read arbitrary current files and label them as old evidence.
 
 Stable finding identity is separate from evidence freshness. Source fingerprints or a versioned source-context fallback help match a finding after line movement. Precise location hashes identify the excerpts; the finding's source-only `evidenceDigest` covers whole cited files because a lint rule can depend on other lines in the same file. A code change can therefore require review even when the highlighted line is unchanged.
 
-Task verification preserves the captured-source result as `sourceStatus` and the report relationship as `reportBinding`. Unchanged current code cannot make an unverified report valid. A changed scanned file in retained `sourceHashes` or `sourceTextHashes` invalidates the report binding, including a scanned file beyond the cited location. Missing or ambiguous source evidence remains explicit.
+The evidence check preserves the captured-source result as `sourceStatus` and the report relationship as `reportBinding`. Unchanged current code cannot make an unverified report valid. A changed scanned file in retained `sourceHashes` or `sourceTextHashes` invalidates the report binding, including a scanned file beyond the cited location. Missing or ambiguous source evidence remains explicit.
 
-Generation commands are included only when supplied through the source manifest or explicit task arguments. They are instructions to evaluate, never commands executed by import/task generation. Re-running Archify against the same saved lint report does not re-run lint; regenerate the report with the original settings and scope, then import it again.
+Generation commands appear only when supplied through the source manifest. They are instructions to evaluate, and import never executes them. Re-running Archify against the same saved lint report does not re-run lint; regenerate the report with the original settings and scope, then import it again.
 
 ## Accept, revoke and compare
 
@@ -186,7 +176,7 @@ node bin/archify.mjs code-analysis check /path/to/repo --language ts --config /p
 
 External comparison checks the source set, tool/version, rule configuration, import settings and severity policy, scope/completeness, source binding, and adapter/identity versions. A changed report hash or report filename alone does not change comparability; legitimate fixes produce different report bytes. Source-qualified reasons explain missing sources or unknown/changed measurement conditions. A disappeared result means **no longer detected**, not automatically **fixed**.
 
-For comparable ESLint reports, Archify first pairs a unique finding at the same location with the same claim and captured line, even when its surrounding context changed the ID. This does not transfer approvals or task evidence. Both snapshots must record the line hash; older snapshots and reports without this evidence use ID matching. A move or edit that leaves no exact pair can still be reported as a possible rename.
+For comparable ESLint reports, Archify first pairs a unique finding at the same location with the same claim and captured line, even when its surrounding context changed the ID. This does not transfer approvals or evidence. Both snapshots must record the line hash; older snapshots and reports without this evidence use ID matching. A move or edit that leaves no exact pair can still be reported as a possible rename.
 
 `--new-only` gates newly identified open findings. When comparing runs that include external sources, an incomparable or unknown comparison fails with `external/comparison-unverified` and exit code 2 instead of passing because an old source disappeared. Without any previous run, every open finding is treated as new. A normal full check remains available to inspect open and evidence-changed items even when external context is incomplete.
 

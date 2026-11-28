@@ -66,7 +66,7 @@ commands, parser diagnostics and ambiguous commands are recorded or rejected
 explicitly. `languageScope.build.units` gives each selected translation unit,
 its command digest, standard, macro names, include paths, target and parse
 status. The raw database text is not saved in `raw-facts.json`; its SHA-256 is.
-If the database changes, a saved question is stale and a findings comparison
+If the database changes, captured navigation is stale and a findings comparison
 reports changed build scope.
 
 Project source bytes are captured once and passed to libclang as unsaved files.

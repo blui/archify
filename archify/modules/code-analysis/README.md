@@ -6,7 +6,7 @@ Start Archify with `npm start -- "/path/to/project" [--locale zh-CN]` from the A
 
 To compare two local commits, add `--base <commit> --head <commit>` to the same `prepare`, `start` or `serve` flow. `--scope` selects a repository-relative directory. Both pinned sides use the existing analyzer, workbench, locale and evidence pipeline. See the quick start for comparison and source-capture limits.
 
-[External diagnostics (C7)](docs/EXTERNAL-DIAGNOSTICS.md) — import existing ESLint, Ruff and SARIF results; browse/filter them with source coverage and evidence; export tasks and accept/revoke baseline decisions in the CLI or local viewer. Static reports retain reading and captured task export.
+[External diagnostics (C7)](docs/EXTERNAL-DIAGNOSTICS.md) — import existing ESLint, Ruff and SARIF results; browse/filter them with source coverage and evidence, and accept or revoke baseline decisions in the CLI or local viewer. Static reports support reading and filtering.
 
 Imported lint errors default to warning; info stays info and the original source
 level is retained. Set `external.severity: "source"` explicitly for original
@@ -23,7 +23,7 @@ function complexity and configured architecture boundaries, and presents a stand
 
 Its review workflows share the same extraction and graph pipeline:
 
-- **A prepared investigation** (`prepare`): `code-analysis prepare <repo-root> --out out/analysis [--locale zh-CN] [--ir architecture.json]` creates `analysis/repo.analysis.html` with captured AI tasks, opens on the overview and exits. The reader follows `--locale`, then optional `meta.locale` (`zh-CN` or English fallback); no server stays running. See [Agent entry and investigation](docs/USAGE.md#agent-entry-and-investigation) for natural Skill delivery and restarting for comparison after edits.
+- **A prepared investigation** (`prepare`): `code-analysis prepare <repo-root> --out out/analysis [--locale zh-CN] [--ir architecture.json]` creates `analysis/repo.analysis.html` with captured source evidence, opens on the overview and exits. The reader follows `--locale`, then optional `meta.locale` (`zh-CN` or English fallback); no server stays running. See [Prepared investigation](docs/USAGE.md#prepared-investigation) for restarting for comparison after edits.
 
 - **On the diagram** (`serve`, also reached through `npm start`):
   1. **Archify delivers the authored diagram** (`archify deliver architecture …`),
@@ -39,18 +39,14 @@ Its review workflows share the same extraction and graph pipeline:
   optional `--ir` / `--map` to verify diagram-to-code component mapping and
   undeclared component imports headlessly), with a baseline, a comparison with the
   previous run, and an exit code.
-- **Review architecture drift** (`drift`): compare two local Git commits against one authored diagram. Review newly observed component imports, open pinned evidence, and download an edge-specific Markdown handoff. See [architecture drift review](docs/USAGE.md#review-architecture-drift-between-two-commits).
-
-`archify code-analysis task` turns findings of a finished run into an AI
-optimization task (JSON or Markdown) and checks its evidence against the current
-working tree; the page uses the same logic through the server.
+- **Review architecture drift** (`drift`): compare two local Git commits against one authored diagram. Review newly observed component imports, open pinned evidence, and download an edge-specific Markdown summary. See [architecture drift review](docs/USAGE.md#review-architecture-drift-between-two-commits).
 
 `check --json` also returns an `investigation` object for a first look: its
-`leads` repeat the ranked priorities with the message, `path:line`, symbol and a
-runnable `task` command, `architecture` summarizes module hotspots, strongest
+`leads` repeat the ranked priorities with the message, `path:line`, symbol and
+impact, `architecture` summarizes module hotspots, strongest
 cross-module edges and structural signals outside `leads`, and `ruleCounts` shows
-how findings divide by rule. Run `check` with `--out` so each lead or structural
-signal is drillable. See
+how findings divide by rule. Run `check` with `--out` to keep the artifacts for
+each lead and structural signal. See
 [First look at an unfamiliar repository](docs/USAGE.md#first-look-at-an-unfamiliar-repository).
 
 JS/TS analysis defaults to `typescript.sdk: "bundled"`. The bundled compiler
@@ -74,7 +70,7 @@ Optional [C6 duplicate detection](docs/USAGE.md#duplicate-code-c6-optional) uses
 separately installed jscpd 5.4.3 executable for all six languages. They use five
 analysis adapters: `ts` covers JavaScript and TypeScript, alongside `py`, `java`,
 `go` and `rust`. C6 preserves
-both source locations, scan coverage, baselines and AI task evidence. It is
+both source locations, scan coverage, baselines and evidence checks. It is
 disabled by default and does not replace dependency or function analysis.
 
 From the `archify/` package directory:
