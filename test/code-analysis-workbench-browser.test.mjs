@@ -80,7 +80,7 @@ test('prepared workbench localizes, copies first-screen evidence, keeps comparis
     assert.equal(visibility.overflow, false, locale + ': no horizontal page overflow');
   };
   const assertPrimaryContrast = async label => {
-    const styles = await run(`['.brief-copy'].map(selector=>{
+    const styles = await run(`['.browse-findings'].map(selector=>{
       const s=getComputedStyle(document.querySelector(selector)),surface=getComputedStyle(document.querySelector(selector).closest('#bauify-reader'));
       return {selector,color:s.color,background:s.backgroundColor,surface:surface.backgroundColor,opacity:s.opacity};
     })`);
@@ -133,15 +133,8 @@ test('prepared workbench localizes, copies first-screen evidence, keeps comparis
     }
   }
   await open(first.html);
-  // Observe the clipboard adapter independently of browser-owned permissions.
-  await run("Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async value => { window.__copied = value; } } })");
-  await run("window.__copied='';document.querySelector('.brief-copy').click()");
-  assert.equal(await run('window.__copied'), await run("JSON.parse(document.getElementById('bauify-analysis').textContent).architectureBrief"));
-  assert.equal(await run("document.querySelector('.brief-status').textContent"), '');
-  assert.equal(await run("document.querySelector('.brief-copy svg path').getAttribute('d')"), 'm5 12 4 4L19 6');
-  await run("new Promise(resolve=>setTimeout(resolve,1700))");
-  assert.equal(await run("document.querySelector('.brief-copy').getAttribute('aria-label')"), 'Copy architecture brief');
-  assert.match(await run('window.__copied'), /does not determine runtime dispatch/);
+  assert.equal(await run("document.querySelector('.brief-copy')"), null);
+  assert.equal(await run("'architectureBrief' in JSON.parse(document.getElementById('bauify-analysis').textContent)"), false);
 
   // Prepare a real source improvement and compare through the same saved-run path.
   fs.writeFileSync(path.join(root, 'src/beta/b.ts'), 'export function b() { return 1; }\n');

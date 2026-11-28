@@ -28,7 +28,6 @@
 import fs from 'node:fs';
 import { standaloneShell } from './standalone.mjs';
 import { analysisLocale, messagesFor, createTranslator } from './i18n.mjs';
-import { architectureHandoff } from './architecture-handoff.mjs';
 import path from 'node:path';
 import { fail } from '../core/index.mjs';
 import { sourceChanges } from './source-changes.mjs';
@@ -151,7 +150,6 @@ export function buildOverlay({ ir, graph, html, map, facts = null, findings = []
     snippets: sourceRoot ? collectSnippets(findings, sourceRoot, components.concat(unmapped.filter((m) => listed.some((f) => (f.moduleIds || []).includes(m.id))), { fileList: [...(run.pullRequest?.changedFiles || []).map(file => ({ path: file.path })), ...(run.pullRequest?.impact?.records || []).flatMap(record => record.locations.map(item => ({ path: item.file }))), ...(pr?.componentDrift?.edges || []).flatMap(edge => [...edge.base, ...edge.head])] }), facts, findingsDocument?.externalEvidence, run.pullRequest) : {},
   };
 
-  payload.architectureBrief = architectureHandoff({ overview: payload.overview, repository: graph.repository, locale: run.locale || ir?.meta?.locale, diagram: Boolean(ir) });
 
   // The Atlas view needs raw facts (files, dependencies, functions); without them only the Classic view exists.
   const atlas = buildAtlas({ graph, facts, findings, review: run.review });

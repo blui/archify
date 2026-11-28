@@ -332,8 +332,7 @@ html[data-bauify-focus="on"] #bauify-layer g.count.focus rect { opacity: 1; }
 #bauify-reader .comparison-banner > b { display: block; font-size: 14px; margin: 3px 0; }
 #bauify-reader .comparison-banner p { font-size: 12px; color: var(--text-muted); line-height: 1.55; margin: 5px 0 0; }
 #bauify-reader .offline-recheck { margin: 8px 0; font-size: 12px; }
-#bauify-reader .architecture-brief-preview textarea, #bauify-reader .start-command { display: block; box-sizing: border-box; width: 100%; min-height: 90px; max-height: 260px; resize: vertical; margin: 8px 0; padding: 8px; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text); background: var(--bg); font: 12px/1.55 ui-monospace, Menlo, Consolas, monospace; }
-#bauify-reader .architecture-brief-preview[hidden] { display: none; }
+#bauify-reader .start-command { display: block; box-sizing: border-box; width: 100%; min-height: 90px; max-height: 260px; resize: vertical; margin: 8px 0; padding: 8px; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text); background: var(--bg); font: 12px/1.55 ui-monospace, Menlo, Consolas, monospace; }
 @media (max-width: 600px) { #bauify-reader .start-copy { min-height: 44px; }
   #bauify-reader > #bauify-overview { padding: 12px; } }
 /* Quiet icon controls leave the graph and the finding titles as the reading focus. */
@@ -347,8 +346,6 @@ html[data-bauify-focus="on"] #bauify-layer g.count.focus rect { opacity: 1; }
 [data-analysis-tip][tabindex]:focus-visible { outline: 2px solid var(--backend-stroke, #159f88); outline-offset: 2px; }
 #bauify-atlas .module-list:focus-visible { outline: 2px solid var(--backend-stroke, #159f88); outline-offset: -2px; }
 #bauify-reader .snapshot-label { display: inline-grid; place-items: center; width: 32px; height: 32px; color: var(--text-muted); }
-#bauify-reader .section-heading .brief-copy { width: 32px; height: 32px; padding: 0; border-color: transparent; background: transparent; color: var(--text); }
-#bauify-reader .section-heading .brief-copy:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
 #bauify-reader .bauify-reanalyze .ui-icon { transition: transform .2s ease; }
 #bauify-reader .bauify-reanalyze.busy .ui-icon { animation: bauify-refresh-turn 1.2s linear infinite; }
 @keyframes bauify-refresh-turn { to { transform: rotate(360deg); } }
@@ -378,7 +375,6 @@ html[data-bauify-focus="on"] #bauify-layer g.count.focus rect { opacity: 1; }
 #bauify-reader .priority-level.amber { --level-border: #b68926; }
 #bauify-reader .priority-level.red { --level-border: #dd5976; }
 #bauify-reader .priority-level.blue { --level-border: #548dd2; }
-#bauify-reader .copy-confirmed .ui-icon { stroke-width: 2; }
 #bauify-detail .finding-location { margin: 4px 0 8px; color: var(--text-muted); font: 12px/1.55 ui-monospace, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
 #bauify-reader .section-heading { margin: 24px 0 10px; }
 #bauify-reader .section-heading h4 { font-size: 15px; }
@@ -477,7 +473,6 @@ html[data-bauify-context="pr"] #bauify-reader .comparison-banner.positive { bord
 #bauify-reader .pr-head-checks > summary { font-size: 12px; color: var(--text-muted); padding: 4px 0; }
 #bauify-reader .pr-head-checks .health-summary { margin-top: 8px; }
 #bauify-reader .pr-review-heading { margin-top: 20px; margin-bottom: 0; }
-#bauify-reader .pr-review-heading .brief-copy { border-color: var(--panel-border); }
 #bauify-reader .pr-pins code { overflow-wrap: anywhere; }
 #bauify-reader .pr-review-download, #bauify-reader [data-review-relation] {
   font: inherit; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 6px;

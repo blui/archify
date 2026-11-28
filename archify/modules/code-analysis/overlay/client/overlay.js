@@ -51,8 +51,6 @@
   } else if (diagramContainer) diagramContainer.before(reader); else document.body.appendChild(reader);
   function uiIcon(name) {
     var paths = {
-      copy: '<rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M6 15a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2"></path>',
-      check: '<path d="m5 12 4 4L19 6"></path>',
       filter: '<path d="M4 5h16l-6 7v5l-4 2v-7z"></path>',
       refresh: '<path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.5-2.6L20 9M4 15l2.4 2.6A7 7 0 0 0 17.9 15"></path>',
       panel: '<rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M15 4v16"></path>',
@@ -63,27 +61,7 @@
     return '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + paths[name] + '</svg>';
   }
   function iconButton(kind, label, extra, attributes) {
-    return '<button type="button" class="icon-button ' + kind + (extra || '') + '" aria-label="' + esc(label) + '" data-copy-label="' + esc(label) + '" data-analysis-tip="' + esc(label) + '"' + (attributes || '') + '>' + uiIcon(kind) + '</button>';
-  }
-  var copyTimers = new WeakMap();
-  function confirmCopy(button) {
-    if (!button) return;
-    clearTimeout(copyTimers.get(button));
-    var copy = button.querySelector('svg');
-    if (copy) copy.outerHTML = uiIcon('check');
-    button.classList.add('copy-confirmed');
-    button.setAttribute('aria-label', tr('Copied'));
-    button.dataset.analysisTip = tr('Copied');
-    copyTimers.set(button, setTimeout(function () {
-      var check = button.querySelector('svg');
-      if (check) check.outerHTML = uiIcon('copy');
-      button.classList.remove('copy-confirmed');
-      var label = button.getAttribute('data-copy-label');
-      if (label) {
-        button.setAttribute('aria-label', label);
-        button.dataset.analysisTip = label;
-      }
-    }, 1600));
+    return '<button type="button" class="icon-button ' + kind + (extra || '') + '" aria-label="' + esc(label) + '" data-analysis-tip="' + esc(label) + '"' + (attributes || '') + '>' + uiIcon(kind) + '</button>';
   }
   var readerCollapsed = false;
   function setReaderCollapsed(collapsed) {
@@ -916,7 +894,6 @@
     h += '</section>';
     if (data.pullRequest) h += '</details>';
     h += '<p class="brief-status ev" role="status" aria-live="polite"></p>';
-    h += '<details class="architecture-brief-preview" hidden><summary>' + esc(tr('Copy manually')) + '</summary><textarea readonly spellcheck="false" aria-label="' + esc(tr('Architecture brief')) + '"></textarea></details>';
     var offline = '';
     if (!live) {
       offline += '<details class="offline-recheck"><summary>' + esc(tr('Recheck after edits')) + '</summary><p class="ev">' + esc(tr('Offline report: current source has not been rechecked.')) + '</p>';
@@ -924,7 +901,7 @@
       else offline += '<p class="ev">' + esc(tr('This report has no saved start command. Run a fresh analysis from the original repository and architecture JSON.')) + '</p>';
       offline += '</details>';
     }
-    h += '<div class="section-heading' + (data.pullRequest ? ' pr-review-heading' : '') + '"><h4>' + esc(tr(data.pullRequest ? 'PR review priorities' : o.priorities.length ? 'Look at first' : 'Architecture brief')) + '</h4>' + iconButton('copy', tr(data.pullRequest ? 'Copy PR impact brief' : 'Copy architecture brief'), ' brief-copy') + '</div>';
+    h += '<div class="section-heading' + (data.pullRequest ? ' pr-review-heading' : '') + '"><h4>' + esc(tr(data.pullRequest ? 'PR review priorities' : o.priorities.length ? 'Look at first' : 'Architecture brief')) + '</h4></div>';
     if (data.pullRequest) h += prReviewPriorities();
     else if (o.priorities.length) {
       o.priorities.forEach(function (id, i) { h += priorityCard(id, i + 1); });
@@ -985,18 +962,8 @@
     overview.querySelector('.browse-findings').addEventListener('click', function () { showFindings('all'); });
     var externalButton = overview.querySelector('.external-findings'); if (externalButton) externalButton.addEventListener('click', function () { showFindings('external'); });
     var sourceButton = overview.querySelector('.overview-sources'); if (sourceButton) sourceButton.addEventListener('click', showSources);
-    var brief = overview.querySelector('.architecture-brief-preview');
-    overview.querySelector('.brief-copy').addEventListener('click', function () {
-      var content=data.architectureBrief||'',message='Copied architecture brief. Ask your coding AI to verify the cited source before editing.';
-      if(data.pullRequest){
-        var p=data.pullRequest,i=p.impact,ids=i?i.categories.architecture.priorities.concat(i.categories.complexity.priorities):[];
-        content=JSON.stringify({repository:p.repository,scope:p.scope,base:p.baseSHA,head:p.headSHA,impact:i?{basis:i.basis,total:i.total,comparison:i.comparison,records:i.records.filter(function(r){return ids.indexOf(r.id)!==-1;}),coverage:i.coverage}:null},null,2);
-        message='Copied PR impact evidence. Verify the cited source and coverage before review.';
-      }
-      copyText(content,overview.querySelector('.brief-status'),brief.querySelector('textarea'),tr(message),brief);
-    });
     var startCopy = overview.querySelector('.start-copy');
-    if (startCopy) startCopy.addEventListener('click', function () { copyText(data.ui.resume.command, overview.querySelector('.start-status'), overview.querySelector('.start-command'), tr('Copied start command.')); });
+    if (startCopy) startCopy.addEventListener('click', function () { copyText(data.ui.resume.command, overview.querySelector('.start-status'), overview.querySelector('.start-command')); });
     var again = overview.querySelector('.bauify-reanalyze');
     if (again) again.addEventListener('click', function () {
       again.disabled = true; again.classList.add('busy'); again.setAttribute('aria-busy', 'true');
@@ -1005,20 +972,13 @@
     });
     overview.querySelectorAll('[data-finding]').forEach(function (el) { el.addEventListener('click', function () { showFinding(el.getAttribute('data-finding')); }); });
   }
-  async function copyText(text, status, preview, success, box) {
+  async function copyText(text, status, preview) {
     preview.value = text;
     try {
       if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error(tr("Clipboard unavailable"));
       await navigator.clipboard.writeText(text);
       status.textContent = '';
-      var source = status.id === 'start-status' ? overview.querySelector('.start-copy') : overview.querySelector('.brief-copy');
-      if (source && source.querySelector('svg')) confirmCopy(source);
-      else if (box) {
-        var action = box.querySelector('.quick-copy, .task-copy');
-        if (action && action.querySelector('svg')) confirmCopy(action);
-      }
     } catch (error) {
-      if (box) { box.hidden = false; box.open = true; }
       preview.focus(); preview.select(); status.textContent = tr('Automatic copy unavailable. Select the text below to copy it manually.');
     }
   }
