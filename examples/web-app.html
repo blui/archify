@@ -3961,12 +3961,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       background: color-mix(in srgb, var(--analysis-accent) 8%, transparent);
     }
     .analysis-info-prompt { flex: 1 1 14rem; min-width: 0; }
-    .analysis-info-start q {
-      font-size: 0.9375rem;
-      font-weight: 650;
+    .analysis-info-start code {
+      font: 600 0.875rem/1.5 ui-monospace, Menlo, Consolas, monospace;
       color: var(--text);
+      overflow-wrap: anywhere;
     }
-    .analysis-info-start q:lang(zh) { quotes: "「" "」"; }
     #code-analysis-dialog button {
       display: inline-flex;
       align-items: center;
@@ -6884,8 +6883,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close();
       });
       document.getElementById('code-analysis-copy').addEventListener('click', function () {
-        var prompt = document.getElementById('code-analysis-prompt').textContent;
-        copyReaderText(prompt, dialog).then(function (copied) {
+        var command = document.getElementById('code-analysis-command').textContent;
+        copyReaderText(command, dialog).then(function (copied) {
           status.textContent = viewerText(copied ? 'viewer.common.copied' : 'viewer.common.copyFailed');
         });
       });

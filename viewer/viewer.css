@@ -3791,12 +3791,11 @@ html[data-present="true"] .page-feedback { display: none; }
   background: color-mix(in srgb, var(--analysis-accent) 8%, transparent);
 }
 .analysis-info-prompt { flex: 1 1 14rem; min-width: 0; }
-.analysis-info-start q {
-  font-size: 0.9375rem;
-  font-weight: 650;
+.analysis-info-start code {
+  font: 600 0.875rem/1.5 ui-monospace, Menlo, Consolas, monospace;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
-.analysis-info-start q:lang(zh) { quotes: "「" "」"; }
 #code-analysis-dialog button {
   display: inline-flex;
   align-items: center;

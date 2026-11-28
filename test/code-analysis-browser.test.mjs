@@ -388,10 +388,11 @@ test('Code Analysis refuses changed IR and preserves captured source in the curr
     const localized = render({
       ...source, meta: { ...source.meta, locale: 'zh-CN', repository: publicRepository },
     }, 'localized');
-    // The prompt targets the reader's own project, so a pinned public repository stays out of it.
-    for (const [file, theme, label, title, prompt] of [
-      [view.delivered, 'dark', 'Code Analysis', 'Architecture Diagnosis', 'Use Archify to create an architecture diagram for this project and start Architecture Diagnosis.'],
-      [localized, 'light', '架构诊断', '架构诊断', '用 Archify 为当前项目生成架构图，并启动架构诊断'],
+    // The command uses placeholders for the reader's own checkout, so a pinned public repository stays out of it.
+    const command = 'node bin/archify.mjs start <repo> --ir <architecture.json>';
+    for (const [file, theme, label, title] of [
+      [view.delivered, 'dark', 'Code Analysis', 'Architecture Diagnosis'],
+      [localized, 'light', '架构诊断', '架构诊断'],
     ]) {
       const html = fs.readFileSync(file, 'utf8');
       assertOfflineArtifact(html, file);
@@ -413,11 +414,11 @@ test('Code Analysis refuses changed IR and preserves captured source in the curr
           getComputedStyle(dialog).backgroundColor === getComputedStyle(document.querySelector('.diagram-container')).backgroundColor];
       })()`), [title, 4, 'analysis-info-close', true, true]);
       assert.equal(await run("document.querySelector('dialog:modal').innerText.includes(" + JSON.stringify(url) + ")"), false);
-      await run("Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { window.copiedPrompt = text; } } })");
+      await run("Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { window.copiedCommand = text; } } })");
       await key('Tab', 9);
       assert.equal(await run('document.activeElement.id'), 'code-analysis-copy');
       await key('Enter', 13);
-      assert.equal(await run('window.copiedPrompt'), prompt);
+      assert.equal(await run('window.copiedCommand'), command);
       await key('Escape', 27);
       await wait("document.getElementById('code-analysis-info').getAttribute('aria-expanded') === 'false'");
       assert.equal(await run('document.activeElement.id'), 'code-analysis-info');

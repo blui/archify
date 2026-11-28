@@ -782,14 +782,14 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       <li data-feature="fix"><span class="analysis-info-icon" aria-hidden="true"></span><span class="analysis-info-copy"><strong>{{i18n:viewer.diagnosis.findingsTitle}}</strong> <span>{{i18n:viewer.diagnosis.findings}}</span></span></li>
     </ul>
     <section class="analysis-info-start">
-      <p class="analysis-info-ask">{{i18n:viewer.diagnosis.ask}}</p>
+      <p class="analysis-info-ask">{{i18n:viewer.diagnosis.run}}</p>
       <div class="analysis-info-bubble">
         <div class="analysis-info-prompt">
-          <p><q id="code-analysis-prompt">{{i18n:viewer.diagnosis.prompt}}</q></p>
+          <p><code id="code-analysis-command">node bin/archify.mjs start &lt;repo&gt; --ir &lt;architecture.json&gt;</code></p>
         </div>
         <button id="code-analysis-copy" type="button">
           <span class="analysis-info-glyph" aria-hidden="true"></span>
-          <span>{{i18n:viewer.diagnosis.copy}}</span>
+          <span>{{i18n:viewer.diagnosis.copyCommand}}</span>
         </button>
       </div>
       <div id="code-analysis-copy-status" role="status"></div>
@@ -892,8 +892,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close();
       });
       document.getElementById('code-analysis-copy').addEventListener('click', function () {
-        var prompt = document.getElementById('code-analysis-prompt').textContent;
-        copyReaderText(prompt, dialog).then(function (copied) {
+        var command = document.getElementById('code-analysis-command').textContent;
+        copyReaderText(command, dialog).then(function (copied) {
           status.textContent = viewerText(copied ? 'viewer.common.copied' : 'viewer.common.copyFailed');
         });
       });
